@@ -3145,10 +3145,10 @@ function commitDeck(list,setNumber,batchDate){
 }
 
 // tc-background-job-contract-v1
-// When a durable background-job backend is available, the server owns the entire
-// generation lifecycle. The browser can be suspended or closed after receiving a
-// jobId. Without the backend capabilities endpoint, the original browser workflow
-// remains the fallback (and cannot promise background completion).
+// When a durable job backend is available, job state is persisted in Upstash.
+// On Vercel, status polling also advances work; closing the browser pauses
+// further processing until the user returns. Without the backend capabilities
+// endpoint, the original browser workflow remains the fallback.
 const tcBgKey=key+'background_generation_job_v1';
 const tcBgBase='/api/generation-jobs';
 let tcBgPollTimer=null,tcBgChecking=false;
@@ -3169,7 +3169,7 @@ function tcBgAlert(title,message,showRefresh=true){
 function tcBgBusy(busy){
  tcGenerationRunning=busy;
  const b=$('make');b.disabled=busy||!doc;
- if(busy)b.textContent='Generating in background...';
+ if(busy)b.textContent='Generating flashcards...';
  else b.textContent=doc?'Generate Flashcards':'Generate Flashcards';
 }
 function tcBgStopPolling(){if(tcBgPollTimer){clearInterval(tcBgPollTimer);tcBgPollTimer=null;}}
@@ -3259,8 +3259,8 @@ async function tcBgCheckStatus(){
    $('info').textContent='Background job stopped. Completed sets have been kept.';
    tcBgStopPolling();tcBgBusy(false);return;
   }
-  tcProgressDisplay(saved,total,'working',`${status==='queued'?'Waiting in server queue':'Generating on the server'} — you can leave this website and return later.`);
-  tcBgAlert('Background generation in progress',`${saved} of ${total} cards saved on the server. You can open another app or close this browser tab.`,true);
+  tcProgressDisplay(saved,total,'working',`${status==='queued'?'Waiting in server queue':'Generating on the server'} — keep this tab open for automatic progress. Saved work is retained if you leave.`);
+  tcBgAlert('Background generation in progress',`${saved} of ${total} cards saved on the server. Keep this tab open to continue generation on Vercel; if you leave, return here to resume.`,true);
   tcBgBusy(true);tcBgStartPolling();
   if(imported)$('info').textContent=`${imported} completed set(s) added from your background job.`;
  }catch(err){
@@ -3304,8 +3304,8 @@ async function tcTryStartBackgroundGeneration(){
   if(typeof jobId!=='string'||jobId.length<12)throw Error('Server did not return a usable job ID.');
   job={id:jobId,pdfName:fileName,sets,cardsPerSet,questionType,startedAt:Date.now()};
   tcBgRemember(job);
-  tcBgAlert('Background generation started',`Job created for ${sets*cardsPerSet} flashcards. You can now safely switch apps or close the tab.`,true);
-  $('info').textContent='Background generation started. Your progress is saved on the server.';
+  tcBgAlert('Background generation started',`Job created for ${sets*cardsPerSet} flashcards. Keep this tab open while generating. If you leave, saved progress can resume when you return.`,true);
+  $('info').textContent='Generation started. Keep this tab open to advance; progress is saved on the server.';
   await tcBgCheckStatus();
  }catch(err){
   tcBgAlert('Background job was not confirmed',`${err.message}. Please check your server before retrying to avoid duplicate jobs.`,false);
