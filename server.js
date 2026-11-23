@@ -1,4 +1,4 @@
-'use strict';
+use strict';
 
 require('dotenv').config();
 const express = require('express');
@@ -738,6 +738,15 @@ if (require.main === module) {
   }
 }
 
-module.exports = { app, parseFlashcards, extractGeminiText, generateFlashcards, buildResponseSchema, requestedCardType };
+module.exports = app;
+Object.assign(module.exports, {
+  app,
+  parseFlashcards,
+  extractGeminiText,
+  generateFlashcards,
+  buildResponseSchema,
+  requestedCardType,
+});
 
 if (process.env.NODE_ENV === 'test') module.exports.__test = {bgTick, bgGet, bgValidateRequest, bgRunOneJob};
+'
