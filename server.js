@@ -1,10 +1,11 @@
-use strict';
+'use strict';
 
 require('dotenv').config();
 const express = require('express');
 const path = require('path');
 
 const app = express();
+const IS_VERCEL = process.env.VERCEL === '1' || Boolean(process.env.VERCEL_ENV);
 app.disable('x-powered-by');
 
 const PORT = Number(process.env.PORT || 3000);
@@ -41,7 +42,10 @@ function boundedInteger(name, fallback, minimum, maximum) {
 const MAX_ACTIVE = boundedInteger('AI_CONCURRENCY', 3, 1, 20);
 const MAX_QUEUE = boundedInteger('AI_QUEUE_LIMIT', 80, 1, 500);
 const MAX_QUEUE_WAIT_MS = boundedInteger('AI_QUEUE_WAIT_MS', 180000, 5000, 600000);
-const PROVIDER_TIMEOUT_MS = boundedInteger('AI_TIMEOUT_MS', 45000, 5000, 120000);
+// A serverless request has a finite execution window. Keep provider fallbacks bounded.
+const PROVIDER_TIMEOUT_MS = IS_VERCEL
+  ? Math.min(12000, boundedInteger('AI_TIMEOUT_MS', 12000, 5000, 120000))
+  : boundedInteger('AI_TIMEOUT_MS', 45000, 5000, 120000);
 const MAX_PROMPT_CHARS = boundedInteger('MAX_PROMPT_CHARS', 80000, 1000, 200000);
 
 const CARD_TYPES = new Set(['mcq', 'identification', 'enumeration', 'fillblank']);
@@ -585,7 +589,7 @@ async function bgRunOneJob(id) {
     if (!job || ['completed', 'failed', 'cancelled'].includes(job.status)) {
       await bgRedis('ZREM', BG_DUE_KEY, id);return;
     }
-    // Other workers will not claim the same job during this provider request.
+
     await bgRedis('ZADD', BG_DUE_KEY, Date.now() + BG_LEASE_SECONDS * 1000, id);
     job.status = 'running';
     let nextRunAt = Date.now() + 500;
@@ -598,7 +602,7 @@ async function bgRunOneJob(id) {
         job.status = 'failed';
         job.message = 'Generation stopped because the AI could not produce enough valid, unique source-linked cards.';
       }
-      // Keep student jobs fair: one batch at a time, next turn goes to queue.
+
     } catch (e) {
       job.failures = (job.failures || 0) + 1;
       const delay = Math.min(180000, 10000 * 2 ** Math.min(job.failures - 1, 5));
@@ -630,7 +634,8 @@ async function bgTick() {
   } finally { bgTickRunning = false; }
 }
 function bgStartWorker() {
-  if (!BG_CONFIGURED || bgTimer) return;
+
+  if (IS_VERCEL || !BG_CONFIGURED || bgTimer) return;
   bgTimer = setInterval(() => { void bgTick(); }, BG_POLL_MS);
   if (!process.argv.includes('--worker')) bgTimer.unref?.();
   void bgTick();
@@ -645,7 +650,7 @@ function bgBasicRateLimit(req) {
   if (now >= window.until) { window.count = 0; window.until = now + 60000; }
   window.count++;
   bgRate.set(key, window);
-  // Generous for classrooms sharing a single network IP.
+
   return window.count <= 60;
 }
 function bgValidateRequest(body) {
@@ -693,33 +698,46 @@ app.post('/api/generation-jobs', async (req, res) => {
       failures: 0, stalls: 0,
       sets: Array.from({ length: input.setCount }, (_, i) => ({setNumber:i+1, status:'queued', attempts:0, cards:[]})),
     };
-    // Atomically commit the job data and queue entry. Job IDs are high-entropy.
+
     const script = `redis.call('SET', KEYS[1], ARGV[1], 'EX', ARGV[2]); redis.call('ZADD', KEYS[2], ARGV[3], ARGV[4]); return 1`;
     await bgRedis('EVAL', script, 2, bgKey(id), BG_DUE_KEY,
       JSON.stringify(job), BG_TTL_SECONDS, Date.now(), id);
-    // Job is safely stored BEFORE sending a success response to the browser.
+
     res.status(202).json(bgPublic(job));
-    void bgTick();
+    if (!IS_VERCEL) void bgTick();
   } catch (e) {
     res.status([400, 413, 429, 503].includes(e?.status) ? e.status : 500)
       .json({ error: e?.message || 'Could not start background generation.' });
   }
 });
+
+async function bgAdvanceDueJob(id) {
+  if (!BG_CONFIGURED) return;
+  const due = await bgRedis('ZSCORE', BG_DUE_KEY, id);
+  if (due == null || !Number.isFinite(Number(due)) || Number(due) > Date.now()) return;
+  await bgRunOneJob(id);
+}
+
 app.get('/api/generation-jobs/:jobId', async (req, res) => {
   res.set('Cache-Control', 'no-store');
   if (!bgSafeJobID(req.params.jobId)) return res.status(404).json({error:'Job not found.'});
   try {
-    const job = await bgGet(req.params.jobId);
+    let job = await bgGet(req.params.jobId);
     if (!job) return res.status(404).json({error:'Job not found or expired.'});
+    if (IS_VERCEL && !['completed', 'failed', 'cancelled'].includes(job.status)) {
+      try {
+        await bgAdvanceDueJob(req.params.jobId);
+      } catch (error) {
+
+        console.warn(`[TraceCard AI] Vercel job poll: ${error?.status || 'storage/provider error'}`);
+      }
+      job = await bgGet(req.params.jobId) || job;
+    }
     return res.json(bgPublic(job));
   } catch (e) { return res.status(503).json({error:e?.message || 'Job status unavailable.'}); }
 });
 
-app.get(['/', '/index.html'], (req, res) => {
-  res.sendFile(path.join(__dirname, 'index.html'));
-});
-app.use('/assets', express.static(path.join(__dirname, 'assets'), { dotfiles: 'deny' }));
-app.use((req, res) => res.status(404).json({ error: 'Not found.' }));
+app.use('/api', (req, res) => res.status(404).json({ error: 'Not found.' }));
 
 if (require.main === module) {
   if (process.argv.includes('--worker')) {
@@ -733,20 +751,11 @@ if (require.main === module) {
     app.listen(PORT, () => {
       console.log(`TraceCard AI running at http://localhost:${PORT}`);
       console.log('Configured AI providers:', PROVIDERS.filter(p => p.key).map(p => p.id).join(' -> ') || 'none');
-      bgStartWorker(); // Also works in a single service; free tiers may sleep while idle.
-    });
+      bgStartWorker(); 
   }
 }
 
 module.exports = app;
-Object.assign(module.exports, {
-  app,
-  parseFlashcards,
-  extractGeminiText,
-  generateFlashcards,
-  buildResponseSchema,
-  requestedCardType,
-});
+Object.assign(module.exports, { app, parseFlashcards, extractGeminiText, generateFlashcards, buildResponseSchema, requestedCardType });
 
 if (process.env.NODE_ENV === 'test') module.exports.__test = {bgTick, bgGet, bgValidateRequest, bgRunOneJob};
-'
