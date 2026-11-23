@@ -589,7 +589,7 @@ async function bgRunOneJob(id) {
     if (!job || ['completed', 'failed', 'cancelled'].includes(job.status)) {
       await bgRedis('ZREM', BG_DUE_KEY, id);return;
     }
-    // Other workers will not claim the same job during this provider request.
+
     await bgRedis('ZADD', BG_DUE_KEY, Date.now() + BG_LEASE_SECONDS * 1000, id);
     job.status = 'running';
     let nextRunAt = Date.now() + 500;
@@ -602,7 +602,7 @@ async function bgRunOneJob(id) {
         job.status = 'failed';
         job.message = 'Generation stopped because the AI could not produce enough valid, unique source-linked cards.';
       }
-      // Keep student jobs fair: one batch at a time, next turn goes to queue.
+   
     } catch (e) {
       job.failures = (job.failures || 0) + 1;
       const delay = Math.min(180000, 10000 * 2 ** Math.min(job.failures - 1, 5));
@@ -634,7 +634,7 @@ async function bgTick() {
   } finally { bgTickRunning = false; }
 }
 function bgStartWorker() {
-  // Vercel Functions are not persistent processes; requests drive job progress below.
+
   if (IS_VERCEL || !BG_CONFIGURED || bgTimer) return;
   bgTimer = setInterval(() => { void bgTick(); }, BG_POLL_MS);
   if (!process.argv.includes('--worker')) bgTimer.unref?.();
@@ -650,7 +650,7 @@ function bgBasicRateLimit(req) {
   if (now >= window.until) { window.count = 0; window.until = now + 60000; }
   window.count++;
   bgRate.set(key, window);
-  // Generous for classrooms sharing a single network IP.
+
   return window.count <= 60;
 }
 function bgValidateRequest(body) {
@@ -698,11 +698,11 @@ app.post('/api/generation-jobs', async (req, res) => {
       failures: 0, stalls: 0,
       sets: Array.from({ length: input.setCount }, (_, i) => ({setNumber:i+1, status:'queued', attempts:0, cards:[]})),
     };
-    // Atomically commit the job data and queue entry. Job IDs are high-entropy.
+
     const script = `redis.call('SET', KEYS[1], ARGV[1], 'EX', ARGV[2]); redis.call('ZADD', KEYS[2], ARGV[3], ARGV[4]); return 1`;
     await bgRedis('EVAL', script, 2, bgKey(id), BG_DUE_KEY,
       JSON.stringify(job), BG_TTL_SECONDS, Date.now(), id);
-    // Job is safely stored BEFORE sending a success response to the browser.
+
     res.status(202).json(bgPublic(job));
     if (!IS_VERCEL) void bgTick();
   } catch (e) {
@@ -710,10 +710,7 @@ app.post('/api/generation-jobs', async (req, res) => {
       .json({ error: e?.message || 'Could not start background generation.' });
   }
 });
-// When running on Vercel, each status request advances at most one due batch.
-// The Upstash sorted set and lease protect jobs from duplicate work across functions.
-// Awaiting that batch keeps work inside the request lifetime (instead of relying
-// on timers or unawaited promises that Vercel may freeze after the response).
+
 async function bgAdvanceDueJob(id) {
   if (!BG_CONFIGURED) return;
   const due = await bgRedis('ZSCORE', BG_DUE_KEY, id);
@@ -740,12 +737,13 @@ app.get('/api/generation-jobs/:jobId', async (req, res) => {
   } catch (e) { return res.status(503).json({error:e?.message || 'Job status unavailable.'}); }
 });
 
-// Vercel serves frontend files from public/; this Express app handles API only.
-// Do not register a root sendFile route pointing to the old root index.html.
+app.get('/', (req, res) => {
+  res.redirect(302, '/index.html');
+});
+
+
 app.use('/api', (req, res) => res.status(404).json({ error: 'Not found.' }));
 
-// Vercel imports this Express app and manages the HTTP listener itself.
-// Render/local Node starts the listener and the persistent background worker.
 if (require.main === module && !IS_VERCEL) {
   if (process.argv.includes('--worker')) {
     if (!BG_CONFIGURED) {
@@ -758,7 +756,7 @@ if (require.main === module && !IS_VERCEL) {
     app.listen(PORT, () => {
       console.log(`TraceCard AI running at http://localhost:${PORT}`);
       console.log('Configured AI providers:', PROVIDERS.filter(p => p.key).map(p => p.id).join(' -> ') || 'none');
-      bgStartWorker(); // Also works in a single service; free tiers may sleep while idle.
+      bgStartWorker();
     });
   }
 }
