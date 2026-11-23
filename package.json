@@ -1,0 +1,19 @@
+{
+  "name": "tracecard-ai",
+  "version": "1.1.0",
+  "private": true,
+  "description": "AI-assisted PDF-to-flashcard prototype with Gemini, Groq, and OpenRouter fallback",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js",
+    "check": "node --check server.js",
+    "test": "node test-mock.js"
+  },
+  "dependencies": {
+    "express": "^5.1.0",
+    "dotenv": "^16.4.7"
+  },
+  "engines": {
+    "node": ">=18"
+  }
+}
