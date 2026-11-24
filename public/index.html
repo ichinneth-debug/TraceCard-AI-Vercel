@@ -3627,7 +3627,7 @@ function drawReminders(){
  if(dueCards.length){
   content.innerHTML=`<div class="reminder due-now"><div class="reminder-copy"><b>You have ${dueCards.length} flashcard${dueCards.length===1?'':'s'} due for review today!</b><p>Make every review count and keep what you’ve learned fresh in your mind.</p></div><button type="button" onclick="session=null;save();show('review')">▷ &nbsp;Review Now</button></div>`;
  }else if(next){
-  content.innerHTML=`<div class="reminder"><div class="reminder-copy"><b>Next Review: ${safe(formatDate(next))}</b><p>${upcoming.length} flashcard(s) scheduled for review.</p></div><button type="button" onclick="calendarEvent()">Add to Calendar</button></div>`;
+  content.innerHTML=`<div class="reminder"><div class="reminder-copy"><b>Next Review: ${safe(next.toLocaleDateString(undefined,{year:'numeric',month:'short',day:'numeric'}))}</b><p>${upcoming.length} flashcard(s) scheduled for review.</p></div><button type="button" onclick="calendarEvent()">Add to Calendar</button></div>`;
  }else{
   content.innerHTML=`<div class="reminder empty"><div class="reminder-copy"><b>No flashcards due for review</b><p>Approve a set to start your learning schedule.</p></div><button type="button" onclick="show('sets')">View Sets</button></div>`;
  }
@@ -5468,9 +5468,9 @@ function tcRenderBellSchedule(){
  const previouslyOpen=new Map([...target.querySelectorAll('.tc-bell-pdf-group')].map(el=>[el.dataset.pdf,el.open]));
  target.replaceChildren();target.dataset.scheduleSignature=signature;
  if(!pdfs.length){target.textContent='No scheduled reviews yet. Rate your recall to set review dates.';return;}
- pdfs.forEach((pdf,index)=>{
+ pdfs.forEach(pdf=>{
   const panel=document.createElement('details');panel.className='tc-bell-pdf-group';panel.dataset.pdf=pdf.pdf;
-  panel.open=previouslyOpen.has(pdf.pdf)?previouslyOpen.get(pdf.pdf):(!previouslyOpen.size&&index===0);
+  panel.open=previouslyOpen.get(pdf.pdf)===true;
   const summary=document.createElement('summary');
   const icon=document.createElementNS('http://www.w3.org/2000/svg','svg');icon.setAttribute('class','icon tc-bell-pdf-icon');icon.setAttribute('aria-hidden','true');
   const use=document.createElementNS('http://www.w3.org/2000/svg','use');use.setAttribute('href','#i-file');icon.appendChild(use);
@@ -5566,7 +5566,17 @@ $('bellMessage').addEventListener('click',event=>{
   tcOpenBellReminder(row.dataset.day,row.dataset.rating,row.dataset.pdf);
  }
 });
-$('bellButton').onclick=()=>{tcRenderBellSchedule();$('bellPopover').classList.toggle('show');$('profilePopover').classList.remove('show');};
+$('bellButton').onclick=()=>{
+ tcRenderBellSchedule();
+ const opening=$('bellPopover').classList.toggle('show');
+ if(opening){
+  const target=$('bellMessage');
+  target.querySelectorAll('.tc-bell-pdf-group').forEach(panel=>{panel.open=false;});
+  target.querySelectorAll('.tc-bell-early-choice').forEach(choice=>choice.remove());
+  target.querySelectorAll('.tc-bell-row').forEach(row=>row.setAttribute('aria-expanded','false'));
+ }
+ $('profilePopover').classList.remove('show');
+};
 $('profileButton').onclick=()=>{$('profilePopover').classList.toggle('show');$('bellPopover').classList.remove('show');};
 $('profileSettings').onclick=()=>{$('profilePopover').classList.remove('show');show('settings');};
 const savedTheme=(()=>{try{return tcStore.getItem(themeKey)==='dark'?'dark':'light'}catch(e){return 'light'}})(); // Respect saved appearance
