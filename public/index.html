@@ -3276,7 +3276,13 @@ function historyDecks(){
  return [...new Set([...cards,...archivedCards].filter(c=>c.status==='approved').map(c=>c.deck))];
 }
 
-const badQuestion=q=>/\b(?:page|slide|section|chapter|unit)\s*(?:no\.?\s*|number\s*|#\s*)?\d+\b|\b(?:pdf|this document|the document|this lecture|the lecture|this module|the module|the handout|uploaded file|source text)\b|\b(?:according to|as stated in|as shown in|listed under|listed on|found on|mentioned in|taken from|based on the)\b|\b(?:who (?:wrote|authored|prepared|owns|published)|who (?:is|was) the (?:author|owner|instructor|professor|publisher)|(?:name|identify) the (?:author|owner|instructor|professor|publisher)|copyright|all rights reserved|prepared by|submitted by|written by)\b/i.test(q);
+const badQuestion=q=>{
+ const question=String(q||'');
+ return /\b(?:page|slide)\s*(?:no\.?\s*|number\s*|#\s*)?\d+\b/i.test(question)||
+  /\b(?:this|the|uploaded|provided)\s+(?:pdf|document|file|slides?|lecture|module|handout)\b/i.test(question)||
+  /\b(?:in|on|from|of|according to|as (?:shown|stated|described) in|based on)\s+(?:(?:the|this|provided|uploaded)\s+)?(?:pages?|slides?|pdf|document|file|source text)\b/i.test(question)||
+  /\b(?:who (?:wrote|authored|prepared|published)|(?:name|identify) the (?:author|owner|instructor|professor|publisher)|copyright|all rights reserved|prepared by|submitted by|written by)\b/i.test(question);
+};
 
 function save(){
  tcStore.setItem(key+'cards',JSON.stringify(cards));
@@ -4208,7 +4214,8 @@ $('make').onclick=async()=>{
    tcProgressDisplay(completed*target+savedCount+found.length,amount*target,'working',`Set ${set+1}/${amount}: ${found.length}/${target} cards saved. Generating next cards...`);
    let failures=0, attempt=0;
    const maxFailures=3;
-   while(found.length<target && attempt<24 && failures<maxFailures && !tcGenerationCancelRequested){
+   const maxAttempts=6; // Stop incomplete sets instead of looping too long.
+   while(found.length<target && attempt<maxAttempts && failures<maxFailures && !tcGenerationCancelRequested){
     attempt++;
     $('info').textContent=`Set ${set+1}/${amount}: ${found.length}/${target} saved. Generating remaining cards...`;
     const portion=[];
@@ -4270,11 +4277,15 @@ ${source}`;
        rejected.content++;
        continue;
       }
-      // Retain strict source traceability, but tolerate harmless PDF line breaks
-      // and spacing differences that otherwise reject valid generated cards.
-      const normalizeSource=x=>String(x).replace(/\s+/g,' ').trim().toLowerCase();
-      const match=excerpt.length>=10&&excerpt.length<=160&&
-       normalizeSource(pages[page-1].text).includes(normalizeSource(excerpt));
+      // Match the backend: strict page + excerpt length, flexible punctuation/dashes.
+      const sourcePage=pages.find(p=>p.page===page);
+      const normalizeSource=(x,asSpace=false)=>String(x??'').normalize('NFKC').toLowerCase()
+       .replace(/[^a-z0-9\s]/g,asSpace?' ':'').replace(/\s+/g,' ').trim();
+      const plainExcerpt=normalizeSource(excerpt);
+      const match=Boolean(sourcePage)&&excerpt.length>=10&&excerpt.length<=160&&
+       plainExcerpt.replace(/\s/g,'').length>=8&&(
+        normalizeSource(sourcePage.text).includes(plainExcerpt)||
+        normalizeSource(sourcePage.text,true).includes(normalizeSource(excerpt,true)));
       if(!match){rejected.source++;continue;}
       found.push({q,a,opts:wanted==='mcq'?tcShuffleGeneratedMcqChoices(opts,a,found):[],type:wanted,page,excerpt,pdf:fileName});
       used.add(q.toLowerCase());added++;
