@@ -5527,8 +5527,8 @@ function renderRecentActivity(){
  }
  rows.sort((a,b)=>b.time-a.time);
  if(!rows.length){$('recentActivity').innerHTML='<div class="empty-activity">Your generated flashcard sets will appear here.</div>';return;}
- const relative=(t)=>{if(!t)return 'Recently';const mins=Math.max(0,Math.floor((Date.now()-t)/60000));return mins<1?'Just now':mins<60?mins+' min ago':mins<1440?Math.floor(mins/60)+' hr ago':Math.floor(mins/1440)+' days ago';};
- $('recentActivity').innerHTML=rows.slice(0,3).map(r=>`<div class="activity-row"><div class="mini-pdf"><svg class="icon" aria-hidden="true"><use href="#i-file"></use></svg></div><div class="activity-desc"><b title="${safe(r.name)}">${safe(r.name)}</b><span>${safe(r.set)} · ${r.amount} cards</span></div><span class="status-pill ${r.state.toLowerCase()}">${r.state==='Approved'?'<svg class="tc-activity-status-check" viewBox="0 0 20 20" aria-hidden="true"><path d="M4 10l4 4 8-8"/></svg>':r.state==='Generated'?'✦ ':''}${r.state}</span><span class="activity-time">${relative(r.time)}</span></div>`).join('');
+ const dateOnlySetLabel=(label)=>String(label||'Flashcard set').replace(/(?:,?\s+)\d{1,2}:\d{2}(?::\d{2})?(?:\s*[AP]\.?M\.?)?\s*$/i,'').trim();
+ $('recentActivity').innerHTML=rows.slice(0,3).map(r=>`<div class="activity-row"><div class="mini-pdf"><svg class="icon" aria-hidden="true"><use href="#i-file"></use></svg></div><div class="activity-desc"><b title="${safe(r.name)}">${safe(r.name)}</b><span>${safe(dateOnlySetLabel(r.set))} · ${r.amount} cards</span></div><span class="status-pill ${r.state.toLowerCase()}">${r.state==='Approved'?'<svg class="tc-activity-status-check" viewBox="0 0 20 20" aria-hidden="true"><path d="M4 10l4 4 8-8"/></svg>':r.state==='Generated'?'✦ ':''}${r.state}</span></div>`).join('');
 }
 
 function updateSearch(){
