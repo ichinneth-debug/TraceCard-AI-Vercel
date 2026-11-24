@@ -2958,7 +2958,7 @@ html.tc-gen-active #info { display:none !important; }
 <div class="tc-history-tools"><button type="button" id="historySearchToggle" class="tc-history-search-toggle" aria-controls="historySearchPanel" aria-expanded="false" onclick="toggleHistorySearch()"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 6h16M4 12h16M4 18h16"/><circle cx="9" cy="6" r="2.5" fill="var(--tc-history-button-bg,#fff)"/><circle cx="16" cy="12" r="2.5" fill="var(--tc-history-button-bg,#fff)"/><circle cx="10" cy="18" r="2.5" fill="var(--tc-history-button-bg,#fff)"/></svg><span>Filters / Search</span><span class="tc-history-search-active" id="historySearchActive" hidden></span></button><button type="button" id="clearReviewHistory" class="tc-history-clear-btn" onclick="clearReviewHistory()"><svg class="icon" aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18M8 6V4h8v2m3 0-1 14H6L5 6m5 4v6m4-6v6"/></svg><span>Clear Review History</span></button></div></div>
 <div id="historySearchPanel" class="tc-history-search-panel" hidden><label for="historySearchInput">Find a question or answer from your Review History</label><div class="tc-history-search-field"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="m16 16 5 5"/></svg><input id="historySearchInput" type="search" placeholder="Type a question, topic, or answer..." autocomplete="off" oninput="searchReviewHistory(this.value)" aria-describedby="historySearchNote"><button type="button" id="historySearchClear" onclick="clearHistorySearchQuery()">Clear</button></div><small id="historySearchNote">Search across all approved sets, including older saved questions, correct answers, and your answers.</small></div>
 <div class="content-stack" id="historyContent"></div></section>
-<section id="settings"><div class="page-heading"><div class="page-heading-icon"><svg class="icon" aria-hidden="true"><use href="#i-settings"></use></svg></div><div><h1>Settings</h1><p>Review notifications, calendar schedules, and local data.</p></div></div><div class="panel settings-panel"><div class="setting-block"><h3>Review Notifications</h3><p>Receive an alert when approved flashcards are due, while this website is open.</p><div class="reminder-actions"><button id="enableNotifications">Enable Notifications</button></div><small id="notificationStatus"></small></div><div class="setting-block"><h3>Google Calendar</h3><p>Add each scheduled review date to Google Calendar, or download all dates as a calendar file.</p><div class="reminder-actions"><button id="calendarNext">Add Review Dates to Google Calendar</button></div></div><div class="setting-block"><h3>Your Data</h3><p>Flashcards and history are stored locally in this browser. Clear Generated Data permanently removes generated flashcards, previous sets, Recent Activity, Review History, scores, and locally saved source PDFs. Your appearance settings are kept.</p></div></div></section>
+<section id="settings"><div class="page-heading"><div class="page-heading-icon"><svg class="icon" aria-hidden="true"><use href="#i-settings"></use></svg></div><div><h1>Settings</h1><p>Review notifications, calendar schedules, and local data.</p></div></div><div class="panel settings-panel"><div class="setting-block"><h3>Review Notifications</h3><p>Receive an alert when approved flashcards are due, while this website is open.</p><div class="reminder-actions"><button id="enableNotifications">Enable Notifications</button></div><small id="notificationStatus"></small></div><div class="setting-block"><h3>Google Calendar</h3><p>Add each scheduled review date to Google Calendar, or download all dates as a calendar file.</p><div class="reminder-actions"><button id="calendarNext">Add Review Dates to Google Calendar</button></div></div><div class="setting-block"><h3>Your Data</h3><p>Flashcards and history are stored locally in this browser. Clear Generated Data removes generated and approved sets, their entries in Recent Activity, unfinished drafts, and saved source PDFs. Completed Review History, answers, and scores are kept. Use Clear Review History separately to delete review results. Your appearance settings are kept.</p></div></div></section>
 <section id="help">
   <div class="page-heading">
     <div class="page-heading-icon"><svg class="icon" aria-hidden="true"><use href="#i-help"></use></svg></div>
@@ -4330,18 +4330,18 @@ $('cancelGeneration').onclick=async()=>{
  }
 };
 
-// CLEAR GENERATED DATA, PREVIOUS SETS, ACTIVITY, AND REVIEW HISTORY.
-// User-requested full reset, not the old keep-history/archive behavior.
+// CLEAR GENERATED DATA ONLY: remove generated-file entries and active cards.
+// Preserve separate Review History scores and a history-only snapshot of reviewed questions.
 $('clear').onclick=async()=>{
  if(tcLegacyGenerating||tcBgStarting||tcBgCancelling){alert('Cancel the active generation first.');return;}
  if(tcBgGet()&&!['failed','cancelled'].includes(tcBgGet().lastStatus||'')){
   alert('Cancel the active background generation before clearing all data.');return;
  }
  if(!await tcConfirmClear({
-  title:'Clear Generated Data & History?',
-  description:'This permanently removes ALL generated and approved flashcards, Recent Activity (including older PDF sets), Review History, answers, scores, review schedules, and saved source PDFs from this browser. You cannot undo this action.',
-  kept:'Your TraceCard AI appearance and settings will be kept. Original PDF files stored outside this website will not be deleted.',
-  confirmLabel:'Yes, Clear Everything',
+  title:'Clear Generated Data?',
+  description:'Remove all generated and approved flashcard sets, their file entries in Recent Activity, unfinished drafts, review schedules, and saved source PDFs from this browser? This cannot be undone.',
+  kept:'Your separate Review History, completed answers, and scores will be kept. To delete those, use Clear Review History. Original PDF files on your device are not affected.',
+  confirmLabel:'Clear Generated Data',
   cancelLabel:'Keep My Data'
  }))return;
  // A job may start while the confirmation dialog is open.
@@ -4349,11 +4349,20 @@ $('clear').onclick=async()=>{
  let pdfDeleteError=null;
  try{await tcClearStoredOriginalPdfs();}
  catch(error){pdfDeleteError=error;console.warn('Could not delete saved source PDFs:',error);tcSourceDocCache.clear();}
+ // Preserve question/answer snapshots only for decks with recorded review results.
+ // Without these snapshots, Review History cannot show old scores once cards are cleared.
+ const reviewedDecks=new Set(logs.map(entry=>entry.deck).filter(Boolean));
+ const historySnapshots=new Map();
+ for(const reviewedCard of [...archivedCards,...cards]){
+  if(reviewedCard.status==='approved'&&reviewedDecks.has(reviewedCard.deck)){
+   historySnapshots.set(reviewedCard.id,{...reviewedCard});
+  }
+ }
+ archivedCards=[...historySnapshots.values()];
  cards=[];
- logs=[];
- archivedCards=[];
- activityArchive=[];
- session=null;
+ // Intentionally keep logs (review answers and scores); Clear Review History handles them.
+ activityArchive=[]; // Remove the generated-file entries from Recent Activity.
+ session=null; // Active Review must stop because its source cards were removed.
  pages=[];
  doc=null;
  fileName='';
@@ -4381,13 +4390,13 @@ $('clear').onclick=async()=>{
  $('tcBgStatus').hidden=true;
  $('make').textContent='Generate Flashcards';
  $('make').disabled=true;
- $('info').textContent='All generated data and history cleared. Choose a PDF to start again.';
+ $('info').textContent='Generated flashcards cleared. Review History and scores were kept. Choose a PDF to start again.';
  save();
  tcBgRefreshReadyBell();
  tcUpdateCancelButton();
  const message=pdfDeleteError
-  ?'Flashcards, History, scores and Recent Activity cleared. Saved PDF storage could not be cleared on this browser.'
-  :'Flashcards, Recent Activity, Review History, scores and saved PDFs cleared.';
+  ?'Generated sets and Recent Activity cleared. Review History and scores were kept. Some saved PDF files could not be removed.'
+  :'Generated sets and Recent Activity cleared. Review History and scores were kept.';
  tcShowApprovalToast(message);
 };
 
