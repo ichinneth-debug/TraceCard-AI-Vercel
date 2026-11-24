@@ -2853,6 +2853,14 @@ body[data-theme="dark"] .tc-clear-kept strong{color:#89d4ff}
 body[data-theme="dark"] .tc-clear-cancel{background:#283a57;color:#f0f5ff;border-color:#4e6383}
 body[data-theme="dark"] .tc-clear-proceed{background:#c33f54;border-color:#c33f54;color:#fff}
 @media(max-width:400px){.tc-clear-actions{flex-direction:column-reverse}.tc-clear-actions button{width:100%}}
+/* Matching Cancel Generation confirmation: identical layout, stop icon and clear warning. */
+.tc-stop-generation-confirm .tc-clear-icon{background:#ffedf0;color:#be3548}
+body[data-theme="dark"] .tc-stop-generation-confirm .tc-clear-icon{background:#493040;color:#ffafba}
+</style>
+<style id="tc-progress-clean-status-style">
+/* Hide only the redundant retry/status message above the generation progress bar.
+   Error details and completion messages return as soon as generation stops. */
+html.tc-gen-active #info { display:none !important; }
 </style>
 </head>
 <body data-theme="light">
@@ -3055,7 +3063,7 @@ const key='tracecard_simple_';
 const themeKey=key+'theme';
 // Returns true only after a user explicitly clicks the destructive confirmation button.
 let tcClearPending=null;
-function tcConfirmClear({title,description,kept,confirmLabel}){
+function tcConfirmClear({title,description,kept,confirmLabel,cancelLabel,icon}){
  if(tcClearPending)return Promise.resolve(false);
  return new Promise(resolve=>{
   const root=$('tcClearConfirm');
@@ -3064,6 +3072,13 @@ function tcConfirmClear({title,description,kept,confirmLabel}){
   $('tcClearMessage').textContent=description;
   $('tcClearKept').textContent=kept;
   $('tcClearProceed').textContent=confirmLabel||'Yes, Clear Data';
+  $('tcClearCancel').textContent=cancelLabel||'Keep My Data';
+  const stopAction=icon==='stop';
+  root.classList.toggle('tc-stop-generation-confirm',stopAction);
+  const iconSvg=root.querySelector('.tc-clear-icon svg');
+  if(iconSvg)iconSvg.innerHTML=stopAction
+   ? '<circle cx="12" cy="12" r="9"/><path d="M9 9l6 6M15 9l-6 6"/>'
+   : '<path d="M3 6h18M8 6V4h8v2m3 0-1 14H6L5 6m5 4v6m4-6v6"/>';
   const dialog=root.querySelector('.tc-clear-dialog');
   const onCancel=()=>finish(false);
   const onConfirm=()=>finish(true);
@@ -3256,6 +3271,9 @@ function save(){
  draw();
 }
 
+// Keep the scroll position of each tab while switching between pages.
+// This is in-memory only: it never touches saved cards, scores, or PDF data.
+const tcPageScrollPositions=Object.create(null);
 function show(page,back=false){
  const utilityPages=['settings','help'];
  // Clicking the same Help/Settings button closes that page and returns to the last work page.
@@ -3272,7 +3290,12 @@ function show(page,back=false){
  if(page==='help' && currentPage!=='help'){
   document.querySelectorAll('#help .tc-faq-item').forEach(item=>{item.open=false;});
  }
- if(page!==currentPage){if(!back)previousPages.push(currentPage);currentPage=page;}
+ const changingTab=page!==currentPage;
+ if(changingTab){
+  tcPageScrollPositions[currentPage]=Math.max(0,window.scrollY||document.documentElement.scrollTop||0);
+  if(!back)previousPages.push(currentPage);
+  currentPage=page;
+ }
  document.querySelectorAll('section').forEach(s=>
   s.classList.toggle('active',s.id===page)
  );
@@ -3284,6 +3307,16 @@ function show(page,back=false){
  });
  document.querySelectorAll('.tc-back').forEach(b=>b.hidden=page==='home'&&previousPages.length===0);
  draw();
+ if(changingTab){
+  // The destination section has been rendered, so restore its previous location
+  // rather than automatically jumping back to the top of Dashboard.
+  const savedTop=Math.max(0,Number(tcPageScrollPositions[page])||0);
+  const html=document.documentElement;
+  const priorBehavior=html.style.scrollBehavior;
+  html.style.scrollBehavior='auto';
+  window.scrollTo(0,savedTop);
+  html.style.scrollBehavior=priorBehavior;
+ }
 }
 
 document.querySelectorAll('nav button').forEach(b=>
@@ -3729,6 +3762,8 @@ function tcUpdateCancelButton(){
  const activeBackground=Boolean(linked&&!['failed','cancelled','completed','succeeded','done'].includes(String(linked.lastStatus||'').toLowerCase()));
  const button=$('cancelGeneration');if(!button)return;
  const activelyGenerating=tcLegacyGenerating||activeBackground||tcBgStarting||tcBgCancelling||tcGenerationCancelRequested;
+ // During generation, the concise progress note below the bar is the sole status text.
+ document.documentElement.classList.toggle('tc-gen-active',activelyGenerating);
  button.hidden=!activelyGenerating;
  button.disabled=tcBgCancelling||tcBgStarting||tcGenerationCancelRequested||!(tcLegacyGenerating||activeBackground);
  $('clear').disabled=tcBgCancelling||tcBgStarting||tcLegacyGenerating||activeBackground;
@@ -3757,7 +3792,24 @@ function tcProgressDisplay(saved,total,phase='working',detail=''){
  $('tcGenProgressTrack').setAttribute('aria-valuemax',String(max));
  $('tcGenProgressTrack').setAttribute('aria-valuenow',String(count));
  $('tcGenProgressFill').style.width=`${(count/max)*100}%`;
- $('tcGenProgressNote').textContent=detail||'Only valid flashcards that were saved are counted.';
+ if(phase==='working'){
+  // One clean, live line for both browser and server-side generation.
+  // Read the linked server job's settings when available, otherwise the current form.
+  const linkedJob=tcLegacyGenerating?null:tcBgGet();
+  let perSet=Math.max(1,Number(linkedJob?.cardsPerSet)||Number($('cardAmount')?.value)||max);
+  let sets=Math.max(1,Number(linkedJob?.sets)||Number($('count')?.value)||Math.ceil(max/perSet));
+  let currentSet=Math.min(sets,Math.floor(count/perSet)+1);
+  let inSet=Math.min(perSet,Math.max(0,count-(currentSet-1)*perSet));
+  // Browser batches supply precise progress for the current set (including resumed drafts).
+  const explicit=String(detail).match(/Set\s+(\d+)\/(\d+):\s*(\d+)\/(\d+)/i);
+  if(explicit){
+   currentSet=Number(explicit[1]);sets=Number(explicit[2]);
+   inSet=Number(explicit[3]);perSet=Number(explicit[4]);
+  }
+  $('tcGenProgressNote').textContent=`Set ${currentSet}/${sets}: ${inSet}/${perSet} Generating Flashcards`;
+ }else{
+  $('tcGenProgressNote').textContent=detail||'Only valid flashcards that were saved are counted.';
+ }
 }
 function tcSavedDraftSummary(){
  if(tcGenerationRunning||!doc||!fileName||!pages.length)return;
@@ -4066,22 +4118,24 @@ $('make').onclick=async()=>{
    found=found.slice(0,target);
    found=found.filter(c=>!used.has(c.q.toLowerCase()));
    found.forEach(c=>used.add(c.q.toLowerCase()));
-   tcProgressDisplay(completed*target+savedCount+found.length,amount*target,'working',`Set ${set+1}/${amount}: ${found.length}/${target} valid cards saved. Waiting for AI batches...`);
+   tcProgressDisplay(completed*target+savedCount+found.length,amount*target,'working',`Set ${set+1}/${amount}: ${found.length}/${target} cards saved. Generating next cards...`);
    let failures=0, attempt=0;
-   while(found.length<target && attempt<30 && failures<5 && !tcGenerationCancelRequested){
+   const maxFailures=3;
+   while(found.length<target && attempt<24 && failures<maxFailures && !tcGenerationCancelRequested){
     attempt++;
     $('info').textContent=`Set ${set+1}/${amount}: ${found.length}/${target} saved. Generating remaining cards...`;
     const portion=[];
-    for(let j=0;j<Math.min(6,readable.length);j++)
-     portion.push(readable[(set*3+(attempt-1)*6+j)%readable.length]);
-    const source=portion.map(p=>`PAGE ${p.page}: ${p.text.slice(0,3500)}`).join('\n\n');
+    for(let j=0;j<Math.min(5,readable.length);j++)
+     portion.push(readable[(set*3+(attempt-1)*5+j)%readable.length]);
+    const source=portion.map(p=>`PAGE ${p.page}: ${p.text.slice(0,2600)}`).join('\n\n');
     const avoid=[
      ...cards.filter(c=>c.pdf===fileName).map(c=>c.q),
      ...found.map(c=>c.q)
-    ].slice(-70);
+    ].slice(-45);
     const wanted=nextType(quotas,found);
     if(!wanted)break;
-    const need=Math.min(8,quotas[wanted]-found.filter(c=>cardType(c)===wanted).length);
+    // Fewer round-trips: request up to 10 cards per batch while retaining validation.
+    const need=Math.min(10,quotas[wanted]-found.filter(c=>cardType(c)===wanted).length);
     const typeRules=wanted==='mcq'?'Use exactly four unique choices including the answer.':wanted==='identification'?'Answer is a short factual string; choices must be empty.':wanted==='fillblank'?'Question must have exactly one ____ blank. Answer is the missing short term or phrase; choices must be empty.':'Answer is an array of 2-5 distinct items supported on the same page; choices must be empty.';
     const responseSchema=makeFlashcardResponseSchema(wanted);
     const prompt=`Write EXACTLY ${need} unique college-level ${wanted} flashcards based ONLY on the subject matter in the text.
@@ -4103,7 +4157,11 @@ ${source}`;
      });
      const data=await res.json().catch(()=>({}));
      if(tcGenerationCancelRequested)break;
-     if(!res.ok)throw Error(data.error||`Backend error (${res.status})`);
+     if(!res.ok){
+      const issue=new Error(data.error||`Backend error (${res.status})`);
+      issue.status=res.status;
+      throw issue;
+     }
      const raw=Array.isArray(data)?data:Array.isArray(data.flashcards)?data.flashcards:[];
      let added=0;
      const rejected={schema:0,content:0,source:0};
@@ -4125,9 +4183,11 @@ ${source}`;
        rejected.content++;
        continue;
       }
-      // Source traceability is mandatory; reject unverifiable excerpts.
+      // Retain strict source traceability, but tolerate harmless PDF line breaks
+      // and spacing differences that otherwise reject valid generated cards.
+      const normalizeSource=x=>String(x).replace(/\s+/g,' ').trim().toLowerCase();
       const match=excerpt.length>=10&&excerpt.length<=160&&
-       pages[page-1].text.toLowerCase().includes(excerpt.toLowerCase());
+       normalizeSource(pages[page-1].text).includes(normalizeSource(excerpt));
       if(!match){rejected.source++;continue;}
       found.push({q,a,opts:wanted==='mcq'?opts:[],type:wanted,page,excerpt,pdf:fileName});
       used.add(q.toLowerCase());added++;
@@ -4144,18 +4204,24 @@ ${source}`;
        requestedType:wanted
       });
       $('info').textContent=raw.length
-       ?`Set ${set+1}: AI returned ${raw.length} cards, but none passed format/source checks. Retrying (${failures}/5)...`
-       :`Set ${set+1}: AI returned no usable cards. Retrying (${failures}/5)...`;
+       ?`Set ${set+1}: ${found.length}/${target} saved. Validating and requesting replacements...`
+       :`Set ${set+1}: ${found.length}/${target} saved. Checking available AI providers...`;
      }
     }catch(error){
      if(tcGenerationCancelRequested)break;
      failures++;
      console.warn('[TraceCard AI] Generation request failed',error?.message||error);
-     $('info').textContent=`Set ${set+1}: ${found.length}/${target} saved. AI temporarily unavailable; retry ${failures}/5...`;
-     if(failures<5)await pause(Math.min(30000,5000*failures));
+     // All providers were attempted on the server already. Repeated 5–30s
+     // sleeps cannot overcome exhausted quotas; fail promptly and save progress.
+     if([400,413,429,503].includes(error?.status))failures=maxFailures;
+     $('info').textContent=failures>=maxFailures
+      ?`Set ${set+1}: ${found.length}/${target} saved. AI providers are busy or unavailable. Your completed progress is safe; try again later.`
+      :`Set ${set+1}: ${found.length}/${target} saved. Trying another AI request...`;
+     if(failures<maxFailures)await pause(700);
     }
     tcGenerationRequestController=null;
-    if(!tcGenerationCancelRequested&&found.length<target && failures<5)await pause(1200);
+    // No fixed pause between successful batches: continue as soon as the model responds.
+    if(!tcGenerationCancelRequested&&found.length<target && failures<maxFailures)await pause(120);
    }
    if(!tcGenerationCancelRequested&&found.length===target){
     commitDeck(found,set+1,generationDate);
@@ -4198,10 +4264,21 @@ ${source}`;
 
 $('cancelGeneration').onclick=async()=>{
  if(tcBgCancelling||tcGenerationCancelRequested)return;
- const job=tcBgGet();
- const activeBg=job&&!['failed','cancelled'].includes(job.lastStatus||'');
+  let job=tcBgGet();
+ let activeBg=job&&!['failed','cancelled'].includes(job.lastStatus||'');
  if(!activeBg&&!tcLegacyGenerating)return;
- if(!confirm('Stop generation now? Completed sets will be kept, but ALL unfinished cards from this generation will be discarded.'))return;
+ if(!await tcConfirmClear({
+  title:'Cancel Generation?',
+  description:'Stop generating flashcards now? All unfinished cards from this generation will be discarded. This cannot be undone.',
+  kept:'Completed flashcard sets, Review History, and saved scores will be kept.',
+  confirmLabel:'Yes, Cancel Generation',
+  cancelLabel:'Keep Generating',
+  icon:'stop'
+ }))return;
+ // Job may finish or change while the confirmation dialog is open.
+ job=tcBgGet();
+ activeBg=job&&!['failed','cancelled'].includes(job.lastStatus||'');
+ if(!activeBg&&!tcLegacyGenerating)return;
  if(activeBg){
   tcBgCancelling=true;tcUpdateCancelButton();
   try{
@@ -4263,7 +4340,16 @@ $('clear').onclick=async()=>{
  $('tcGenProgress').hidden=true;
  $('make').textContent='Generate Flashcards';
  cards=[];session=null;opened='';historyCard='';historyDeck='';
+ // Clear outdated completion UI so a past generation cannot appear as ready.
+ try{tcStore.removeItem(tcBgReadyKey);}catch(_){}
+ $('tcGeneratedCompleteToast').hidden=true;
+ $('tcBgStatus').hidden=true;
+ $('info').textContent=doc
+  ?'Generated flashcards cleared. Your PDF is still selected for new generation.'
+  :'Generated flashcards cleared. Choose a PDF to start again.';
  save();
+ tcBgRefreshReadyBell();
+ tcShowApprovalToast('Generated flashcards cleared. Review History, scores, and Recent Activity were kept.');
 };
 
 // SET MANAGEMENT
@@ -4382,8 +4468,9 @@ function drawSets(){
  const ds=visibleDecks();
 
  if(!ds.length){
-  $('list').textContent=
-   'No pending flashcard sets. Approved sets are available in Review and History.';
+  $('list').textContent=cards.length
+   ?'No pending flashcard sets. Approved sets are available in Review and History.'
+   :'No generated flashcard sets yet. Upload a PDF on the Dashboard to create flashcards.';
   return;
  }
 
@@ -4629,6 +4716,7 @@ async function clearReviewHistory(){
  historyDeck='';historyCard='';historyFilter='all';historySearchQuery='';historySearchOrigin=false;
  const input=$('historySearchInput');if(input)input.value='';
  save();
+ tcShowApprovalToast('Review History and scores cleared. Your approved flashcards and schedules were kept.');
 }
 
 function latestResults(deck){
@@ -4694,6 +4782,14 @@ function drawHistory(){
  const historyCards=[...archivedCards.filter(a=>!cards.some(c=>c.id===a.id)),...cards];
  const searchIndicator=$('historySearchActive');
  if(searchIndicator)searchIndicator.hidden=!historySearchQuery;
+ // A newly approved set is not a completed review. With no recorded answers,
+ // History must visibly be empty after clearing, while approved cards remain.
+ const hasRecordedAnswers=logs.length>0||Boolean(session&&Object.keys(session.answers||{}).length);
+ if(!hasRecordedAnswers){
+  historyDeck='';historyCard='';historyFilter='all';historySearchOrigin=false;
+  content.innerHTML='<div class="box"><b>No review history yet.</b><p>Your saved answers and scores will appear here after you review flashcards. Approved sets and review schedules are still available.</p></div>';
+  return;
+ }
  if(historySearchQuery&&!historyDeck){drawHistoryGlobalSearch(historyCards);return;}
 
 
