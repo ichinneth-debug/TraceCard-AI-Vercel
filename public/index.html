@@ -1205,14 +1205,12 @@ body[data-theme="dark"] #home .tc-hero-live-spark{opacity:.5 !important}
 #history .tc-history-search-active[hidden]{display:none}
 #history .tc-history-search-panel{width:min(100%,1000px);margin:0 0 18px;padding:16px 19px;border:1px solid #e4e8ef;border-radius:17px;background:#fffdfb;box-shadow:0 6px 24px rgba(18,39,70,.035)}
 #history .tc-history-search-panel[hidden]{display:none!important}
-#history .tc-history-search-panel label{display:block;color:#172650;font-weight:750;margin-bottom:9px}
 #history .tc-history-search-field{display:flex;align-items:center;gap:10px;min-height:48px;padding:0 9px 0 13px;border:1px solid #dce4ed;border-radius:13px;background:#fff}
 #history .tc-history-search-field:focus-within{border-color:#fc8d40;box-shadow:0 0 0 3px rgba(255,101,9,.12)}
 #history .tc-history-search-field svg{flex:0 0 19px;width:19px;height:19px;color:#e97524}
 #history .tc-history-search-field input{flex:1;min-width:0;outline:none;border:0!important;box-shadow:none!important;background:transparent!important;color:#11254a!important;font-size:15px;padding:9px 0}
 #history .tc-history-search-field input::placeholder{color:#8a94a5}
 #history .tc-history-search-field button{padding:7px 11px;border:0;border-radius:8px;background:#fff0e2;color:#b54c0f;font:inherit;font-weight:700;cursor:pointer}
-#history #historySearchNote{display:block;margin:10px 2px 0;color:#697892;font-size:12px}
 #history .tc-history-search-summary{font-size:13px;color:#63728d;margin:6px 2px 13px}
 #history .tc-history-hit{display:block;text-align:left;width:100%;padding:18px 20px;margin:10px 0;border:1px solid #e4e8ef;border-radius:16px;background:#fff;color:#162343;box-shadow:0 3px 13px rgba(14,32,74,.035);font:inherit;cursor:pointer;overflow-wrap:anywhere}
 #history .tc-history-hit:hover,#history .tc-history-hit:focus-visible{border-color:#ffab79;background:#fffaf5;outline-offset:3px}
@@ -3010,9 +3008,9 @@ body[data-theme="dark"] #bellMessage .tc-bell-rating-heading{color:#e8efff;}
 <section id="sets"><button class="tc-back" onclick="appBack()"><svg class="tc-back-arrow" viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M19 12H5m7-7-7 7 7 7" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg><span>Back</span></button><div class="page-heading"><div class="page-heading-icon"><svg class="icon" aria-hidden="true"><use href="#i-layers"></use></svg></div><div><h1>Flashcard Sets</h1><p>Make sure your flashcards are just right before adding them to your study materials.</p></div></div><div class="content-stack" id="list"></div></section>
 <section id="review"><button class="tc-back" onclick="appBack()"><svg class="tc-back-arrow" viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M19 12H5m7-7-7 7 7 7" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg><span>Back</span></button><div class="page-heading"><div class="page-heading-icon"><svg class="icon" aria-hidden="true"><use href="#i-calendar"></use></svg></div><div><h1>Review</h1><p>Go through your flashcards at your own pace and prepare for your next review.</p></div></div><div class="content-stack" id="quiz"></div></section>
 <section id="history"><button class="tc-back" onclick="appBack()"><svg class="tc-back-arrow" viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M19 12H5m7-7-7 7 7 7" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg><span>Back</span></button>
-<div class="page-heading tc-history-heading"><div class="page-heading-icon"><svg class="icon" aria-hidden="true"><use href="#i-history"></use></svg></div><div class="tc-history-heading-copy"><h1>Review History</h1><p>Look back at your completed reviews, check your scores, and see how you've improved.</p></div>
+<div class="page-heading tc-history-heading"><div class="page-heading-icon"><svg class="icon" aria-hidden="true"><use href="#i-history"></use></svg></div><div class="tc-history-heading-copy"><h1>Review History</h1></div>
 <div class="tc-history-tools"><button type="button" id="historySearchToggle" class="tc-history-search-toggle" aria-controls="historySearchPanel" aria-expanded="false" onclick="toggleHistorySearch()"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 6h16M4 12h16M4 18h16"/><circle cx="9" cy="6" r="2.5" fill="var(--tc-history-button-bg,#fff)"/><circle cx="16" cy="12" r="2.5" fill="var(--tc-history-button-bg,#fff)"/><circle cx="10" cy="18" r="2.5" fill="var(--tc-history-button-bg,#fff)"/></svg><span>Filters / Search</span><span class="tc-history-search-active" id="historySearchActive" hidden></span></button><button type="button" id="clearReviewHistory" class="tc-history-clear-btn" onclick="clearReviewHistory()"><svg class="icon" aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18M8 6V4h8v2m3 0-1 14H6L5 6m5 4v6m4-6v6"/></svg><span>Clear Review History</span></button></div></div>
-<div id="historySearchPanel" class="tc-history-search-panel" hidden><label for="historySearchInput">Find a question or answer from your Review History</label><div class="tc-history-search-field"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="m16 16 5 5"/></svg><input id="historySearchInput" type="search" placeholder="Type a question, topic, or answer..." autocomplete="off" oninput="searchReviewHistory(this.value)" aria-describedby="historySearchNote"><button type="button" id="historySearchClear" onclick="clearHistorySearchQuery()">Clear</button></div><small id="historySearchNote">Search across all approved sets, including older saved questions, correct answers, and your answers.</small></div>
+<div id="historySearchPanel" class="tc-history-search-panel" hidden><div class="tc-history-search-field"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="m16 16 5 5"/></svg><input id="historySearchInput" type="search" placeholder="Type a title, topic or question" autocomplete="off" oninput="searchReviewHistory(this.value)" aria-label="Search review history by title, topic or question"><button type="button" id="historySearchClear" onclick="clearHistorySearchQuery()">Clear</button></div></div>
 <div class="content-stack" id="historyContent"></div></section>
 <section id="settings"><div class="page-heading"><div class="page-heading-icon"><svg class="icon" aria-hidden="true"><use href="#i-settings"></use></svg></div><div><h1>Settings</h1><p>Review notifications, calendar schedules, and local data.</p></div></div><div class="panel settings-panel"><div class="setting-block"><h3>Review Notifications</h3><p>Receive an alert when approved flashcards are due, while this website is open.</p><div class="reminder-actions"><button id="enableNotifications">Enable Notifications</button></div><small id="notificationStatus"></small></div><div class="setting-block"><h3>Google Calendar</h3><p>Add each scheduled review date to Google Calendar, or download all dates as a calendar file.</p><div class="reminder-actions"><button id="calendarNext">Add Review Dates to Google Calendar</button></div></div><div class="setting-block"><h3>Your Data</h3><p>Flashcards and history are stored locally in this browser. Clear Generated Data removes generated and approved sets, their entries in Recent Activity, unfinished drafts, and saved source PDFs. Completed Review History, answers, and scores are kept. Use Clear Review History separately to delete review results. Your appearance settings are kept.</p></div></div></section>
 <section id="help">
@@ -5085,8 +5083,7 @@ function drawHistory(){
  const historyCards=[...archivedCards.filter(a=>!cards.some(c=>c.id===a.id)),...cards];
  const searchIndicator=$('historySearchActive');
  if(searchIndicator)searchIndicator.hidden=!historySearchQuery;
- // A newly approved set is not a completed review. With no recorded answers,
- // History must visibly be empty after clearing, while approved cards remain.
+
  const hasRecordedAnswers=logs.length>0||Boolean(session&&Object.keys(session.answers||{}).length);
  if(!hasRecordedAnswers){
   historyDeck='';historyCard='';historyFilter='all';historySearchOrigin=false;
@@ -5252,7 +5249,7 @@ async function viewSource(id){
  catch(err){return alert(err.message);}
 
  $('reader').hidden=false;
- // Only change the displayed filename; keep the raw name for PDF matching.
+
  const displayName=String(c.pdf||'PDF').replace(/\+/g,' ');
  let readableName=displayName;
  try{readableName=decodeURIComponent(displayName);}catch(_){}
@@ -5355,8 +5352,6 @@ document.addEventListener('visibilitychange',()=>{
 });
 
 
-// Open only the flashcards scheduled for the selected reminder date.
-// No review logs, history scores or other scheduled cards are deleted.
 function tcBellRatingOrder(){return ['Remembered','Partially Remembered','Difficult','Other scheduled reviews'];}
 function tcBellRatingMap(){
  const latest=new Map();
@@ -5414,7 +5409,7 @@ function tcOpenBellReminder(day,rating){
  const keep=document.createElement('button');keep.type='button';keep.className='tc-bell-keep-scheduled';keep.textContent='Keep Scheduled';
  keep.addEventListener('click',event=>{event.stopPropagation();choice.remove();row.setAttribute('aria-expanded','false');row.focus();});
  actions.append(now,keep);choice.append(title,detail,actions);row.insertAdjacentElement('afterend',choice);
- // Scroll the options into view, including in the small mobile bell popover.
+
  requestAnimationFrame(()=>choice.scrollIntoView({block:'nearest',behavior:'smooth'}));
  now.focus({preventScroll:true});
 }
@@ -5455,8 +5450,7 @@ function tcRenderBellSchedule(){
   row.title=isDue?'Open due questions':'Review ahead of schedule or keep the date';
   target.appendChild(row);
  }
- // The orange action remains usable when only upcoming cards exist.
- // It never erases an unfinished session or review history.
+ 
  $('bellReview').disabled=false;
  $('bellReview').textContent=dueNow?'Open Due Review':'Choose Review Date';
 }function renderDashboardStats(){
@@ -5757,7 +5751,7 @@ document.querySelectorAll('.tc-header-icon[data-page]').forEach(button=>{
    panel.addEventListener('mouseenter',()=>{if(canHover){hovered=true;stop();}});
    panel.addEventListener('mouseleave',()=>{if(canHover){hovered=false;start();}});
    document.addEventListener('visibilitychange',()=>{if(document.hidden)stop();else start();});
-   // The Help slideshow starts when Help opens and pauses when another page is active.
+ 
    new MutationObserver(()=>{if(section.classList.contains('active'))start();else stop();})
     .observe(section,{attributes:true,attributeFilter:['class']});
    showImmediately(0);
