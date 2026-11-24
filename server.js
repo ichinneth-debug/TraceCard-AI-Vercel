@@ -1,15 +1,23 @@
 'use strict';
 
+// Vercel supplies environment variables directly. Load .env only when available locally.
 try { require('dotenv').config(); } catch (error) {
   if (error?.code !== 'MODULE_NOT_FOUND') throw error;
 }
 const express = require('express');
 const path = require('path');
 const IS_VERCEL = Boolean(process.env.VERCEL);
-
+// Vercel background scheduling is optional; status polling can finish batches
+// when the package or request context is unavailable.
+const TC_BACKEND_VERSION = 'system-checks-waituntil-fix-1';
+let backgroundWaitUntil = null;
 if (IS_VERCEL) {
-  try { vercelWaitUntil = require('@vercel/functions').waitUntil; }
-  catch { console.warn('[TraceCard AI] Install @vercel/functions for background execution; using status-driven recovery.'); }
+  try {
+    const api = require('@vercel/functions');
+    if (typeof api.waitUntil === 'function') backgroundWaitUntil = api.waitUntil;
+  } catch {
+    console.warn('[TraceCard AI] Vercel waitUntil unavailable; using status-driven recovery.');
+  }
 }
 
 const app = express();
@@ -39,7 +47,8 @@ const PROVIDERS = [
   },
 ];
 
-
+// Fastest configured provider first by default. Customize without code changes:
+// AI_PROVIDER_ORDER=groq,gemini,openai,openrouter
 const preferredProviders=(process.env.AI_PROVIDER_ORDER || 'groq,gemini,openai,openrouter')
   .toLowerCase().split(',').map(x=>x.trim()).filter(Boolean);
 PROVIDERS.sort((a,b)=>{
@@ -139,6 +148,9 @@ function runQueue() {
   }
 }
 
+// Keep strict page + 10-160 character checks, but tolerate punctuation/dash differences.
+// Checking both forms handles "sodium-potassium" vs "sodium potassium" while
+// rejecting excerpts that are not actually present on the referenced PDF page.
 function normalizeExcerptText(value, punctuationAsSpace = false) {
   const text = String(value ?? '').normalize('NFKC').toLowerCase();
   const normalized = punctuationAsSpace
@@ -150,17 +162,17 @@ function sourceExcerptOnPage(pageText, excerpt) {
   if (typeof excerpt !== 'string' || excerpt.length < 10 || excerpt.length > 160 ||
       typeof pageText !== 'string') return false;
   const plainExcerpt = normalizeExcerptText(excerpt);
-
+  // Do not accept excerpts made of only punctuation/whitespace.
   if (plainExcerpt.replace(/\s/g, '').length < 8) return false;
   return normalizeExcerptText(pageText).includes(plainExcerpt) ||
     normalizeExcerptText(pageText, true).includes(normalizeExcerptText(excerpt, true));
 }
-
+// Validate excerpts against the matching PAGE N text in ordinary API prompts.
 function quotedInSource(prompt, page, excerpt) {
   if (typeof prompt !== 'string') return true;
   const marker = /^PAGE (\d+):\s*/gm;
   const spans = [...prompt.matchAll(marker)];
-  if (!spans.length) return true; 
+  if (!spans.length) return true; // Legacy API calls without page-formatted source.
   for (let i = 0; i < spans.length; i++) {
     if (Number(spans[i][1]) !== page) continue;
     const start = spans[i].index + spans[i][0].length;
@@ -192,7 +204,7 @@ function parseFlashcards(raw, requestedType = null, prompt = null, sourcePages =
     : Array.isArray(value?.cards) ? value.cards : null;
   if (!list?.length) throw new AIError('Provider returned no flashcards.', 502);
 
- 
+  // Background jobs validate against the full PDF, not just the five-page prompt window.
   const pagesByNumber = Array.isArray(sourcePages)
     ? new Map(sourcePages.map(p => [p.page, p.text])) : null;
   const reasons = { format: 0, type: 0, answer: 0, source: 0 };
@@ -435,6 +447,7 @@ app.get('/api/health', (req, res) => {
   res.set('Cache-Control', 'no-store');
   res.json({
     ok: true,
+    backendVersion: TC_BACKEND_VERSION,
     aiConfigured: PROVIDERS.some(p => Boolean(p.key)),
     providers: PROVIDERS.map(p => ({
       name: p.id,
@@ -442,7 +455,7 @@ app.get('/api/health', (req, res) => {
       available: Boolean(p.key) && (cooldownUntil.get(p.id) || 0) <= Date.now(),
     })),
     concurrency: { active, queued: queue.length, maximum: MAX_ACTIVE },
-    background: { configured: BG_CONFIGURED, mode: IS_VERCEL ? (vercelWaitUntil ? 'vercel-waitUntil' : 'status-driven') : 'worker', globalConcurrency: BG_CONCURRENCY, batchSize: BG_BATCH_SIZE },
+    background: { configured: BG_CONFIGURED, mode: IS_VERCEL ? (typeof backgroundWaitUntil === 'function' ? 'vercel-waitUntil' : 'status-driven') : 'worker', globalConcurrency: BG_CONCURRENCY, batchSize: BG_BATCH_SIZE },
   });
 });
 
@@ -732,13 +745,27 @@ async function bgRunVercelWindow(id) {
   } while (Date.now() < stopStartingAt);
 }
 function bgKickVercel(id) {
-  if (!vercelWaitUntil || bgVercelRuns.has(id)) return;
-  const task = bgRunVercelWindow(id)
+  if (bgVercelRuns.has(id)) return true;
+  if (typeof backgroundWaitUntil !== 'function') return false;
+  // Register a deferred task before starting work. A missing/invalid request
+  // context must not leave a saved job unconfirmed or start an untracked batch.
+  let release;
+  const gate = new Promise(resolve => { release = resolve; });
+  const task = gate.then(start => start ? bgRunVercelWindow(id) : undefined)
     .catch(e => console.warn(`[TraceCard AI] Vercel job worker: ${e?.message || 'error'}`))
-    .finally(() => bgVercelRuns.delete(id));
-  bgVercelRuns.set(id, task);
-  vercelWaitUntil(task);
+    .finally(() => { if (bgVercelRuns.get(id) === task) bgVercelRuns.delete(id); });
+  try {
+    backgroundWaitUntil(task);
+    bgVercelRuns.set(id, task);
+    release(true);
+    return true;
+  } catch {
+    release(false);
+    console.warn('[TraceCard AI] Vercel scheduling unavailable; status requests will process the job.');
+    return false;
+  }
 }
+
 async function bgTick() {
   if (!BG_CONFIGURED || bgTickRunning || bgActive >= BG_CONCURRENCY) return;
   bgTickRunning = true;
@@ -830,7 +857,7 @@ app.post('/api/generation-jobs', async (req, res) => {
     await bgRedis('EVAL', script, 2, bgKey(id), BG_DUE_KEY,
       JSON.stringify(job), BG_TTL_SECONDS, Date.now(), id);
 
-    if (IS_VERCEL && vercelWaitUntil) bgKickVercel(id);
+    if (IS_VERCEL) bgKickVercel(id);
     res.status(202).json(bgPublic(job));
     if (!IS_VERCEL) void bgTick();
   } catch (e) {
@@ -884,8 +911,7 @@ app.get('/api/generation-jobs/:jobId', async (req, res) => {
     let job = await bgGet(id);
     if (!job) return res.status(404).json({error:'Job not found or expired.'});
     if (IS_VERCEL && !['completed','failed','cancelled'].includes(job.status)) {
-      if (vercelWaitUntil) bgKickVercel(id);
-      else {
+      if (!bgKickVercel(id)) {
         // No new package needed for this fallback: finish one batch while the
         // HTTP request is alive. Redis locks prevent duplicate processing.
         await bgRunOneJob(id);
