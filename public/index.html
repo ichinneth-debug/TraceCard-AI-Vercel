@@ -3251,7 +3251,16 @@ function tcTodayDayKey(){return tcReviewDayKey(new Date());}
 function tcDueByCalendarDay(card){
  return card.status==='approved'&&(!card.next||(tcReviewDayKey(card.next)&&tcReviewDayKey(card.next)<=tcTodayDayKey()));
 }
-const due=()=>cards.filter(tcDueByCalendarDay);
+// Generated cards live in `cards`. Reviewed/scheduled cards from cleared batches
+// live in `archivedCards` so their individual review dates remain actionable.
+function tcFindReviewCard(id){
+ return cards.find(c=>c.id===id)||archivedCards.find(c=>c.id===id)||null;
+}
+function tcReviewCards(){
+ const liveIds=new Set(cards.map(c=>c.id));
+ return [...cards,...archivedCards.filter(c=>!liveIds.has(c.id)&&c.status==='approved'&&c.next)];
+}
+const due=()=>tcReviewCards().filter(tcDueByCalendarDay);
 
 function visibleDecks(){
  return decks().filter(deck=>{
@@ -3332,7 +3341,7 @@ document.querySelectorAll('nav button').forEach(b=>
 // REMINDERS AND GOOGLE CALENDAR
 
 function scheduledCards(){
- return cards.filter(c=>
+ return tcReviewCards().filter(c=>
   c.status==='approved'&&
   c.next&&
   !Number.isNaN(new Date(c.next).getTime())
@@ -3592,6 +3601,31 @@ async function tcClearStoredOriginalPdfs(){
  }finally{db.close();}
  tcSourceDocCache.clear();
 }
+// Keep only PDFs still needed for stored generated cards or preserved Review History.
+// Deleting the dashboard generation data must not break source traceability
+// for an approved card whose review schedule and score are being retained.
+async function tcPruneStoredOriginalPdfs(requiredNames){
+ const keep=new Set([...requiredNames].filter(Boolean));
+ const db=await tcOpenPdfDB();
+ try{
+  await new Promise((resolve,reject)=>{
+   const tx=db.transaction(tcPdfDBStore,'readwrite');
+   const cursor=tx.objectStore(tcPdfDBStore).openCursor();
+   cursor.onsuccess=()=>{
+    const item=cursor.result;
+    if(!item)return;
+    if(!keep.has(item.key))item.delete();
+    item.continue();
+   };
+   cursor.onerror=()=>reject(cursor.error||Error('Cannot inspect stored PDFs'));
+   tx.oncomplete=()=>resolve();
+   tx.onerror=()=>reject(tx.error||Error('Could not prune stored PDFs'));
+   tx.onabort=()=>reject(tx.error||Error('Could not prune stored PDFs'));
+  });
+ }finally{db.close();}
+ for(const name of tcSourceDocCache.keys())if(!keep.has(name))tcSourceDocCache.delete(name);
+}
+
 async function tcGetOriginalPdf(name){
  const db=await tcOpenPdfDB();
  try{
@@ -4339,16 +4373,15 @@ $('clear').onclick=async()=>{
  }
  if(!await tcConfirmClear({
   title:'Clear Generated Data?',
-  description:'Remove all generated and approved flashcard sets, their file entries in Recent Activity, unfinished drafts, review schedules, and saved source PDFs from this browser? This cannot be undone.',
-  kept:'Your separate Review History, completed answers, and scores will be kept. To delete those, use Clear Review History. Original PDF files on your device are not affected.',
+  description:'All generated flashcards and related files will be deleted. This cannot be undone.',
+  kept:'Review History, answers, scores, and upcoming review schedules will be kept. PDFs needed for saved review questions will also stay in this browser. To remove review data, use Clear Review History.',
   confirmLabel:'Clear Generated Data',
   cancelLabel:'Keep My Data'
  }))return;
  // A job may start while the confirmation dialog is open.
  if(tcLegacyGenerating||tcBgStarting||tcBgCancelling||Boolean(tcBgGet()&&!['failed','cancelled'].includes(tcBgGet().lastStatus||'')))return;
- let pdfDeleteError=null;
- try{await tcClearStoredOriginalPdfs();}
- catch(error){pdfDeleteError=error;console.warn('Could not delete saved source PDFs:',error);tcSourceDocCache.clear();}
+ // Preserve question/answer snapshots and their individual next-review dates.
+ // Clear Generated Data must NOT discard schedules belonging to Review History.
  // Preserve question/answer snapshots only for decks with recorded review results.
  // Without these snapshots, Review History cannot show old scores once cards are cleared.
  const reviewedDecks=new Set(logs.map(entry=>entry.deck).filter(Boolean));
@@ -4359,6 +4392,10 @@ $('clear').onclick=async()=>{
   }
  }
  archivedCards=[...historySnapshots.values()];
+ let pdfDeleteError=null;
+ try{
+  await tcPruneStoredOriginalPdfs(archivedCards.filter(c=>c.next).map(c=>c.pdf));
+ }catch(error){pdfDeleteError=error;console.warn('Could not prune unused source PDFs:',error);}
  cards=[];
  // Intentionally keep logs (review answers and scores); Clear Review History handles them.
  activityArchive=[]; // Remove the generated-file entries from Recent Activity.
@@ -4390,13 +4427,13 @@ $('clear').onclick=async()=>{
  $('tcBgStatus').hidden=true;
  $('make').textContent='Generate Flashcards';
  $('make').disabled=true;
- $('info').textContent='Generated flashcards cleared. Review History and scores were kept. Choose a PDF to start again.';
+ $('info').textContent='Generated flashcards cleared. Review History, scores, and review schedules were kept. Choose a PDF to start again.';
  save();
  tcBgRefreshReadyBell();
  tcUpdateCancelButton();
  const message=pdfDeleteError
-  ?'Generated sets and Recent Activity cleared. Review History and scores were kept. Some saved PDF files could not be removed.'
-  :'Generated sets and Recent Activity cleared. Review History and scores were kept.';
+  ?'Generated sets and Recent Activity cleared. History, scores, and schedules were kept; some unused PDF files could not be removed.'
+  :'Generated sets and Recent Activity cleared. Review History, scores, and schedules were kept.';
  tcShowApprovalToast(message);
 };
 
@@ -4608,14 +4645,14 @@ function drawReview(){
  session.results=session.results||{};
  session.index=Math.max(0,Number(session.index)||0);
  while(session.index<session.ids.length){
-  const id=session.ids[session.index],c=cards.find(x=>x.id===id);
+  const id=session.ids[session.index],c=tcFindReviewCard(id);
   if(c&&c.status==='approved'&&(
    session.reminderDay?tcReviewDayKey(c.next)===session.reminderDay:tcDueByCalendarDay(c)
   ))break;
   session.index++;
  }
  if(session.index>=session.ids.length){
-  const nextDates=cards.filter(c=>c.deck===session.deck&&c.status==='approved'&&c.next).map(c=>new Date(c.next).getTime()).filter(Number.isFinite);
+  const nextDates=tcReviewCards().filter(c=>c.deck===session.deck&&c.status==='approved'&&c.next).map(c=>new Date(c.next).getTime()).filter(Number.isFinite);
   const next=nextDates.length?new Date(Math.min(...nextDates)):null;
   const correctCount=Object.values(session.results||{}).filter(x=>x===true).length;
   const animate=tcReviewCompletionAnimationPending;
@@ -4627,7 +4664,7 @@ function drawReview(){
    <div class="actions"><button onclick="show('history')">View History</button><button onclick="session=null;save();show('review')">Review Other Due Cards</button>${next?`<button onclick="calendarEvent()">Add Review Dates to Google Calendar</button>`:''}</div></div>`;
   return;
  }
- const c=cards.find(x=>x.id===session.ids[session.index]);if(!c)return;
+ const c=tcFindReviewCard(session.ids[session.index]);if(!c)return;
  const type=cardType(c),saved=session.answers[c.id];
  // Enumeration gets one field per expected item; counts are derived from the stored answer, never exposed as clues.
  const enumCount=type==='enumeration'?Math.max(2,answerParts(c.a).length):0;
@@ -4736,7 +4773,7 @@ function drawReview(){
 }
 function saveSessionOnly(){tcStore.setItem(key+'session',JSON.stringify(session));}
 function rate(id,rating,days){
- const c=cards.find(x=>x.id===id);if(!c||!session||session.ids[session.index]!==id)return;
+ const c=tcFindReviewCard(id);if(!c||!session||session.ids[session.index]!==id)return;
  const answered=session.answers?.[id];if(!answered?.checked)return;
  const now=new Date(),next=new Date(now);next.setDate(next.getDate()+days);c.next=next.toISOString();
  logs.unshift({cardId:c.id,deck:c.deck,q:c.q,opts:[...(c.opts||[])],type:cardType(c),correctAnswer:c.a,userAnswer:answered.answer,rating,correct:answered.correct,date:now.toISOString(),next:c.next});
@@ -4750,21 +4787,27 @@ function rate(id,rating,days){
 // HISTORY
 
 async function clearReviewHistory(){
- const hasHistory=logs.length>0||archivedCards.length>0||!!(session&&Object.keys(session.answers||{}).length);
+ const hasHistory=logs.length>0||archivedCards.length>0||cards.some(c=>c.next)||!!(session&&Object.keys(session.answers||{}).length);
  if(!hasHistory)return;
  if(!await tcConfirmClear({
   title:'Clear Review History?',
-  description:'This permanently deletes your review answers, scores, and saved Review History on this device.',
-  kept:'Your generated flashcards, approved sets, review schedules, and Recent Activity will be kept.',
+  description:'This permanently deletes your review answers, scores, next-review schedules, and saved Review History on this device.',
+  kept:'Your generated flashcards, approved sets, and Recent Activity will be kept. Current approved cards can be reviewed again.',
   confirmLabel:'Clear Review History'
  }))return;
+ // Review History owns saved ratings and their next-review dates.
+ // Reset schedules on still-generated cards, and remove archived-only review cards.
+ cards.forEach(c=>{if(c.status==='approved')c.next=null;});
  logs=[];
  archivedCards=[];
  session=null;
+ // Any archived-only PDFs are no longer needed, but keep PDFs of live cards.
+ try{await tcPruneStoredOriginalPdfs(cards.map(c=>c.pdf));}
+ catch(error){console.warn('Could not prune archived review PDFs:',error);}
  historyDeck='';historyCard='';historyFilter='all';historySearchQuery='';historySearchOrigin=false;
  const input=$('historySearchInput');if(input)input.value='';
  save();
- tcShowApprovalToast('Review History and scores cleared. Your approved flashcards and schedules were kept.');
+ tcShowApprovalToast('Review History, scores, and next-review schedules cleared. Generated flashcards were kept.');
 }
 
 function latestResults(deck){
@@ -4825,7 +4868,7 @@ function drawHistoryGlobalSearch(historyCards){
 
 function drawHistory(){
  const clearButton=$('clearReviewHistory');
- if(clearButton)clearButton.disabled=!(logs.length||archivedCards.length||(session&&Object.keys(session.answers||{}).length));
+ if(clearButton)clearButton.disabled=!(logs.length||archivedCards.length||cards.some(c=>c.next)||(session&&Object.keys(session.answers||{}).length));
  const content=$('historyContent');
  const historyCards=[...archivedCards.filter(a=>!cards.some(c=>c.id===a.id)),...cards];
  const searchIndicator=$('historySearchActive');
@@ -4835,7 +4878,7 @@ function drawHistory(){
  const hasRecordedAnswers=logs.length>0||Boolean(session&&Object.keys(session.answers||{}).length);
  if(!hasRecordedAnswers){
   historyDeck='';historyCard='';historyFilter='all';historySearchOrigin=false;
-  content.innerHTML='<div class="box"><b>No review history yet.</b><p>Your saved answers and scores will appear here after you review flashcards. Approved sets and review schedules are still available.</p></div>';
+  content.innerHTML='<div class="box"><b>No review history yet.</b><p>Your saved answers and scores will appear here after you review flashcards. Existing approved sets remain available to review.</p></div>';
   return;
  }
  if(historySearchQuery&&!historyDeck){drawHistoryGlobalSearch(historyCards);return;}
@@ -4982,7 +5025,7 @@ function closeSource(){
 }
 
 async function viewSource(id){
- const c=cards.find(x=>x.id===id);
+ const c=tcFindReviewCard(id);
  if(!c)return;
 
  let sourceDocument;
