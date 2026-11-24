@@ -6,6 +6,14 @@ try { require('dotenv').config(); } catch (error) {
 }
 const express = require('express');
 const path = require('path');
+const IS_VERCEL = Boolean(process.env.VERCEL);
+// Install @vercel/functions to keep work alive after an HTTP response.
+// Without it, status requests still resume a batch before responding.
+let vercelWaitUntil = null;
+if (IS_VERCEL) {
+  try { vercelWaitUntil = require('@vercel/functions').waitUntil; }
+  catch { console.warn('[TraceCard AI] Install @vercel/functions for background execution; using status-driven recovery.'); }
+}
 
 const app = express();
 app.disable('x-powered-by');
@@ -49,7 +57,7 @@ function boundedInteger(name, fallback, minimum, maximum) {
   return Math.max(minimum, Math.min(maximum, Math.floor(value)));
 }
 
-const MAX_ACTIVE = boundedInteger('AI_CONCURRENCY', 3, 1, 20);
+const MAX_ACTIVE = boundedInteger('AI_CONCURRENCY', 5, 1, 20);
 const MAX_QUEUE = boundedInteger('AI_QUEUE_LIMIT', 80, 1, 500);
 const MAX_QUEUE_WAIT_MS = boundedInteger('AI_QUEUE_WAIT_MS', 180000, 5000, 600000);
 const PROVIDER_TIMEOUT_MS = boundedInteger('AI_TIMEOUT_MS', 25000, 5000, 120000);
@@ -141,8 +149,8 @@ function runQueue() {
 function normalizeExcerptText(value, punctuationAsSpace = false) {
   const text = String(value ?? '').normalize('NFKC').toLowerCase();
   const normalized = punctuationAsSpace
-    ? text.replace(/[^a-z0-9\s]/g, ' ')
-    : text.replace(/[^a-z0-9\s]/g, '');
+    ? text.replace(/[^\p{L}\p{N}\p{M}\s]/gu, ' ')
+    : text.replace(/[^\p{L}\p{N}\p{M}\s]/gu, '');
   return normalized.replace(/\s+/g, ' ').trim();
 }
 function sourceExcerptOnPage(pageText, excerpt) {
@@ -355,6 +363,7 @@ async function askChatCompletion(provider, prompt, schema, signal = null) {
   if (provider.id === 'groq') {
 
     const strictSupported = /^openai\/gpt-oss-(?:20b|120b)$/i.test(provider.model);
+    if (strictSupported) body.reasoning_effort = 'low';
     body.response_format = strictSupported
       ? { type: 'json_schema', json_schema: { name: 'tracecard_flashcards', strict: true, schema } }
       : { type: 'json_object' };
@@ -407,22 +416,26 @@ async function generateFlashcards(prompt, requestedType = 'mcq', signal = null, 
       const raw = provider.id === 'gemini'
         ? await askGemini(provider, prompt, schema, signal)
         : await askChatCompletion(provider, prompt, schema, signal);
-      const cards = parseFlashcards(raw, requestedType, prompt, sourcePages);
+      let cards;
+      try { cards = parseFlashcards(raw, requestedType, prompt, sourcePages); }
+      catch (error) { error.validationFailure = true; throw error; }
       console.info(`[TraceCard AI] ${provider.id}: ${cards.length} valid ${requestedType} cards in ${Date.now()-startedAt}ms`);
       return cards;
     } catch (error) {
       if (signal?.aborted || error?.status === 499) throw new AIError('Generation cancelled.', 499);
-      recordFailure(provider, error);
+      if (error.validationFailure) console.warn(`[TraceCard AI] ${provider.id}: response failed card validation; trying fallback`);
+      else recordFailure(provider, error);
     }
   }
   const configured = PROVIDERS.some(p => p.key);
   if (!configured) {
     throw new AIError('No AI provider configured. Add API keys to your server .env file.', 503);
   }
-  if (!tried) {
-    throw new AIError('All AI providers are temporarily cooling down. Try again shortly.', 503);
-  }
-  throw new AIError('All AI providers failed or are unavailable. Please try again later.', 503);
+  const availableAt = Math.min(...PROVIDERS.filter(p => p.key).map(p => Math.max(Date.now(), cooldownUntil.get(p.id) || 0)));
+  const error = new AIError(tried ? 'All AI providers failed or are unavailable. Please try again later.' : 'All AI providers are temporarily cooling down. Try again shortly.', 503);
+  error.retryAfterMs = Math.max(0, availableAt - Date.now());
+  error.cooldownOnly = !tried;
+  throw error;
 }
 
 app.get('/api/health', (req, res) => {
@@ -436,6 +449,7 @@ app.get('/api/health', (req, res) => {
       available: Boolean(p.key) && (cooldownUntil.get(p.id) || 0) <= Date.now(),
     })),
     concurrency: { active, queued: queue.length, maximum: MAX_ACTIVE },
+    background: { configured: BG_CONFIGURED, mode: IS_VERCEL ? (vercelWaitUntil ? 'vercel-waitUntil' : 'status-driven') : 'worker', globalConcurrency: BG_CONCURRENCY, batchSize: BG_BATCH_SIZE },
   });
 });
 
@@ -474,8 +488,13 @@ const BG_PREFIX = 'tracecard:bg:v1:';
 const BG_DUE_KEY = BG_PREFIX + 'due';
 const BG_TTL_SECONDS = 7 * 24 * 60 * 60;
 // One batch can attempt several providers serially; lease must cover their combined timeouts.
-const BG_LEASE_SECONDS = Math.ceil(PROVIDER_TIMEOUT_MS / 1000) * Math.max(1,PROVIDERS.filter(p=>p.key).length) + 90;
-const BG_CONCURRENCY = boundedInteger('BG_CONCURRENCY', 2, 1, 5);
+const BG_BATCH_DEADLINE_MS = boundedInteger('BG_BATCH_DEADLINE_MS', 45000, 10000, 90000);
+const BG_LEASE_SECONDS = Math.ceil(BG_BATCH_DEADLINE_MS / 1000) + 65;
+const BG_CONCURRENCY = Math.min(MAX_ACTIVE, boundedInteger('BG_CONCURRENCY', 5, 1, 15));
+const BG_BATCH_SIZE = boundedInteger('BG_BATCH_SIZE', 10, 5, 15);
+const BG_SLOT_KEY = BG_PREFIX + 'worker-slots';
+// Maximum time to start more batches within one Vercel invocation.
+const BG_VERCEL_RUN_MS = boundedInteger('BG_VERCEL_RUN_MS', 45000, 5000, 120000);
 const BG_MAX_SOURCE_CHARS = boundedInteger('BG_MAX_SOURCE_CHARS', 120000, 10000, 250000);
 const BG_POLL_MS = boundedInteger('BG_POLL_MS', 3500, 2000, 15000);
 const BG_MAX_ATTEMPTS_PER_SET = boundedInteger('BG_MAX_ATTEMPTS_PER_SET', 6, 1, 20);
@@ -527,7 +546,25 @@ else
   redis.call('ZADD', KEYS[3], ARGV[6], ARGV[5])
 end
 return 1`;
-const BG_UNLOCK_SCRIPT = `if redis.call('GET', KEYS[1]) == ARGV[1] then return redis.call('DEL', KEYS[1]) end return 0`;
+// Atomically claim a due job AND a global slot (across Vercel instances).
+// Redis server time avoids different invocation clocks affecting lease expiry.
+const BG_CLAIM_SCRIPT = `
+local t = redis.call('TIME')
+local now = tonumber(t[1])*1000 + math.floor(tonumber(t[2])/1000)
+redis.call('ZREMRANGEBYSCORE', KEYS[3], '-inf', now)
+local due = redis.call('ZSCORE', KEYS[2], ARGV[3])
+if not due or tonumber(due) > now then return 0 end
+if redis.call('EXISTS', KEYS[1]) == 1 then return 0 end
+if redis.call('ZCARD', KEYS[3]) >= tonumber(ARGV[4]) then return 0 end
+local untilMs = now + tonumber(ARGV[2])*1000
+redis.call('SET', KEYS[1], ARGV[1], 'EX', ARGV[2])
+redis.call('ZADD', KEYS[3], untilMs, ARGV[1])
+redis.call('ZADD', KEYS[2], untilMs, ARGV[3])
+return 1`;
+const BG_UNLOCK_SCRIPT = `
+redis.call('ZREM', KEYS[2], ARGV[1])
+if redis.call('GET', KEYS[1]) == ARGV[1] then return redis.call('DEL', KEYS[1]) end
+return 0`;
 async function bgSaveClaimed(job, token, nextRunAt) {
   job.updatedAt = Date.now();
   const done = ['completed', 'failed', 'cancelled'].includes(job.status);
@@ -538,7 +575,7 @@ async function bgSaveClaimed(job, token, nextRunAt) {
   if (Number(result) !== 1) throw new AIError('Background job lease expired; will recover from checkpoint.', 503);
 }
 async function bgUnlock(id, token) {
-  try { await bgRedis('EVAL', BG_UNLOCK_SCRIPT, 1, bgLockKey(id), token); }
+  try { await bgRedis('EVAL', BG_UNLOCK_SCRIPT, 2, bgLockKey(id), BG_SLOT_KEY, token); }
   catch { /* The expiring lock safely releases itself. */ }
 }
 function bgPublic(job) {
@@ -609,10 +646,17 @@ async function bgProcessBatch(job, signal = null) {
     return 0;
   }
 
-  const want = Math.min(10, quota[type] - set.cards.filter(c => c.type === type).length);
+  const want = Math.min(BG_BATCH_SIZE, quota[type] - set.cards.filter(c => c.type === type).length);
   const prompt = bgPrompt(job, set, type, want);
   set.attempts++;
-  const batch = await queueTask(() => generateFlashcards(prompt, type, signal, job.pages));
+  // The Redis slot is the concurrency limit for background requests. Do not
+  // also wait in the legacy in-memory queue while holding a timed lease.
+  let batch;
+  try { batch = await generateFlashcards(prompt, type, signal, job.pages); }
+  catch (error) {
+    if (error.cooldownOnly) set.attempts--; // No AI request was actually made.
+    throw error;
+  }
   const used = new Set(job.sets.flatMap(s => s.cards.map(c => c.question.trim().toLowerCase())));
   let added = 0;
   for (const card of batch) {
@@ -637,19 +681,22 @@ function bgRetryLimitReached(job) {
 }
 async function bgRunOneJob(id) {
   const token = crypto.randomBytes(20).toString('hex');
-  const locked = await bgRedis('SET', bgLockKey(id), token, 'EX', BG_LEASE_SECONDS, 'NX');
-  if (locked !== 'OK') return;
+  const locked = await bgRedis('EVAL', BG_CLAIM_SCRIPT, 3, bgLockKey(id), BG_DUE_KEY, BG_SLOT_KEY,
+    token, BG_LEASE_SECONDS, id, BG_CONCURRENCY);
+  if (Number(locked) !== 1) return false;
   try {
     const job = await bgGet(id);
     if (!job || ['completed', 'failed', 'cancelled'].includes(job.status)) {
       await bgRedis('ZREM', BG_DUE_KEY, id);return;
     }
 
-    await bgRedis('ZADD', BG_DUE_KEY, Date.now() + BG_LEASE_SECONDS * 1000, id);
     job.status = 'running';
     const aborter = new AbortController();
     bgRunningControllers.set(id, aborter);
-    let nextRunAt = Date.now() + 250;
+    let nextRunAt = Date.now();
+    const timer = setTimeout(() => aborter.abort(), BG_BATCH_DEADLINE_MS);
+    const before = job.sets.reduce((n,s)=>n+s.cards.length,0);
+    const batchStarted = Date.now();
     try {
       const added = await bgProcessBatch(job, aborter.signal);
       job.failures = 0;
@@ -662,17 +709,40 @@ async function bgRunOneJob(id) {
       }
 
     } catch (e) {
-      job.failures = (job.failures || 0) + 1;
-      const delay = Math.min(180000, 10000 * 2 ** Math.min(job.failures - 1, 5));
+      if (!e?.cooldownOnly) job.failures = (job.failures || 0) + 1;
+      const delay = Math.min(300000, Math.max(e?.retryAfterMs || 0, 3000 * 2 ** Math.min(Math.max(0,(job.failures || 0)-1), 5)));
       nextRunAt = Date.now() + delay;
       if (job.failures >= BG_MAX_ATTEMPTS_PER_SET || bgRetryLimitReached(job)) {
         job.status = 'failed';
         job.message = 'Generation stopped after repeated AI failures. Completed sets are saved; incomplete sets are not shown.';
       }
       console.warn(`[TraceCard AI] Background batch failed (${e?.status || 'provider'}); retry ${job.failures}`);
-    }
+    } finally { clearTimeout(timer); }
     await bgSaveClaimed(job, token, nextRunAt);
+    const after = job.sets.reduce((n,s)=>n+s.cards.length,0);
+    console.info(`[TraceCard AI] Batch checkpoint: +${after-before}, ${after}/${job.setCount*job.cardsPerSet} saved, ${Date.now()-batchStarted}ms, ${job.status}`);
+    return job.status === 'running' && job.failures === 0 && after > before;
   } finally { bgRunningControllers.delete(id); await bgUnlock(id, token); }
+}
+// Vercel does not run a permanent setInterval worker. Resume the specific
+// saved job from both the creation request and status polling. waitUntil tracks
+// the promise, including the actual AI request and Redis checkpoint.
+const bgVercelRuns = new Map();
+async function bgRunVercelWindow(id) {
+  const stopStartingAt = Date.now() + BG_VERCEL_RUN_MS;
+  do {
+    const more = await bgRunOneJob(id);
+    if (!more) break;
+    // A checkpoint has been committed and the lock released before the next batch.
+  } while (Date.now() < stopStartingAt);
+}
+function bgKickVercel(id) {
+  if (!vercelWaitUntil || bgVercelRuns.has(id)) return;
+  const task = bgRunVercelWindow(id)
+    .catch(e => console.warn(`[TraceCard AI] Vercel job worker: ${e?.message || 'error'}`))
+    .finally(() => bgVercelRuns.delete(id));
+  bgVercelRuns.set(id, task);
+  vercelWaitUntil(task);
 }
 async function bgTick() {
   if (!BG_CONFIGURED || bgTickRunning || bgActive >= BG_CONCURRENCY) return;
@@ -765,8 +835,9 @@ app.post('/api/generation-jobs', async (req, res) => {
     await bgRedis('EVAL', script, 2, bgKey(id), BG_DUE_KEY,
       JSON.stringify(job), BG_TTL_SECONDS, Date.now(), id);
 
+    if (IS_VERCEL && vercelWaitUntil) bgKickVercel(id);
     res.status(202).json(bgPublic(job));
-    void bgTick();
+    if (!IS_VERCEL) void bgTick();
   } catch (e) {
     res.status([400, 413, 429, 503].includes(e?.status) ? e.status : 500)
       .json({ error: e?.message || 'Could not start background generation.' });
@@ -814,8 +885,18 @@ app.get('/api/generation-jobs/:jobId', async (req, res) => {
   res.set('Cache-Control', 'no-store');
   if (!bgSafeJobID(req.params.jobId)) return res.status(404).json({error:'Job not found.'});
   try {
-    const job = await bgGet(req.params.jobId);
+    const id = req.params.jobId;
+    let job = await bgGet(id);
     if (!job) return res.status(404).json({error:'Job not found or expired.'});
+    if (IS_VERCEL && !['completed','failed','cancelled'].includes(job.status)) {
+      if (vercelWaitUntil) bgKickVercel(id);
+      else {
+        // No new package needed for this fallback: finish one batch while the
+        // HTTP request is alive. Redis locks prevent duplicate processing.
+        await bgRunOneJob(id);
+        job = await bgGet(id) || job;
+      }
+    }
     return res.json(bgPublic(job));
   } catch (e) { return res.status(503).json({error:e?.message || 'Job status unavailable.'}); }
 });
@@ -854,4 +935,4 @@ Object.assign(module.exports, {
   app, parseFlashcards, extractGeminiText,
   generateFlashcards, buildResponseSchema, requestedCardType,
 });
-if (process.env.NODE_ENV === 'test') module.exports.__test = {bgTick, bgGet, bgValidateRequest, bgRunOneJob, bgBadQuestion, bgVerifyCard, sourceExcerptOnPage, bgRetryLimitReached};
+if (process.env.NODE_ENV === 'test') module.exports.__test = {bgTick, bgGet, bgValidateRequest, bgRunOneJob, bgBadQuestion, bgVerifyCard, sourceExcerptOnPage, bgRetryLimitReached, bgRunVercelWindow};
