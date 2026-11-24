@@ -2953,6 +2953,30 @@ body[data-theme="dark"] #bellMessage .tc-bell-rating-heading{color:#e8efff;}
 #bellMessage .tc-bell-pdf-rows .tc-bell-early-choice{margin:0 0 3px;}
 @media(max-width:360px){#bellMessage .tc-bell-pdf-rows{padding-inline:7px;}#bellMessage .tc-bell-pdf-rows .tc-bell-row{gap:5px;padding:8px 6px;}#bellMessage .tc-bell-row-arrow{display:none;}}
 </style>
+<style id="tc-bell-pdf-dark-mode-fix">
+/* Match the existing dark-blue reminder rows; leave light mode unchanged. */
+body[data-theme="dark"] #bellMessage .tc-bell-pdf-group {
+  background:#182d47!important;
+  border-color:#344b68!important;
+  color:#f2f6ff!important;
+}
+body[data-theme="dark"] #bellMessage .tc-bell-pdf-group>summary {
+  background:transparent!important;
+  color:#f2f6ff!important;
+}
+body[data-theme="dark"] #bellMessage .tc-bell-pdf-group>summary:hover {
+  background:rgba(140,206,255,.08)!important;
+}
+body[data-theme="dark"] #bellMessage .tc-bell-pdf-summary strong {
+  color:#f2f6ff!important;
+  -webkit-text-fill-color:#f2f6ff!important;
+}
+body[data-theme="dark"] #bellMessage .tc-bell-pdf-summary small {
+  color:#bac9e1!important;
+  -webkit-text-fill-color:#bac9e1!important;
+}
+body[data-theme="dark"] #bellMessage .tc-bell-chevron {color:#bac9e1!important;opacity:1;}
+</style>
 </head>
 <body data-theme="light">
 
