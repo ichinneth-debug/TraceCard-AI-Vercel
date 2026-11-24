@@ -2868,6 +2868,19 @@ html.tc-gen-active #info { display:none !important; }
 .status-pill.approved{display:inline-flex;align-items:center;justify-content:center;gap:5px;vertical-align:middle;}
 .status-pill.approved .tc-activity-status-check{display:block;width:13px;height:13px;fill:none;stroke:currentColor;stroke-width:2.5;stroke-linecap:round;stroke-linejoin:round;flex:none;}
 </style>
+<style id="tc-research-completion-style">
+.tc-research-instructions{margin:15px 0;padding:13px 15px;border:1px solid var(--tc-outline,#e8e2db);border-radius:12px;color:inherit;font-size:13px}
+.tc-research-instructions p{margin:5px 0 0;line-height:1.55}
+.tc-research-email{display:block;text-align:left;margin:12px auto;max-width:420px;font-size:14px}
+.tc-research-email input{display:block;width:100%;margin-top:6px;padding:11px;border:1px solid var(--tc-outline,#dce5f1);border-radius:10px;font:inherit}
+
+.tc-research-completion[hidden]{display:none!important}
+.tc-research-completion{max-width:640px;text-align:center;overflow-wrap:anywhere}
+.tc-research-completion h3{margin:0 0 10px;color:inherit}
+.tc-research-completion .tc-research-code{margin:16px 0;padding:16px;border:1px dashed #f5a66e;background:#fff3e9;border-radius:12px;color:#a94300;font-size:clamp(16px,3vw,25px);font-weight:700;letter-spacing:.035em;user-select:all}
+.tc-research-completion button{background:#ed650b!important;border-color:#ed650b!important;color:#fff!important}
+body[data-theme="dark"] .tc-research-completion .tc-research-code{background:#2d251e;border-color:#ff964d;color:#ffc18e}
+</style>
 </head>
 <body data-theme="light">
 
@@ -2925,7 +2938,7 @@ html.tc-gen-active #info { display:none !important; }
 </svg></div><span class="drop-primary">Drag &amp; drop your PDF here</span><span class="drop-or">or</span><span class="choose-button"><svg class="icon" aria-hidden="true"><use href="#i-upload"></use></svg>Choose File</span></label>
     <p class="upload-note">Supported: PDFs with typed text or scanned pages.</p><div class="upload-status" id="uploadSummary" aria-live="polite"></div>
    </div>
-   <div class="panel generate-panel" id="generationSettings"><h2>Flashcard Generation</h2><p style="color:#68758d;margin:6px 0 0">Make your study sessions your own by choosing the question type, sets, and cards per set.</p><div class="generate-controls">
+   <div class="panel generate-panel" id="generationSettings"><h2>Flashcard Generation</h2><p style="color:#68758d;margin:6px 0 0">Make your study sessions your own by choosing the question type, sets, and cards per set.</p><div class="tc-research-instructions"><strong>Research participation (optional)</strong><p>Upload a PDF, generate at least one set, approve at least 10 cards from that set, and answer and rate every approved card in the review session. After the review, enter the same student email you will use in the survey to claim your unique completion code. Your score does not affect eligibility.</p><p>For verification, your email, activity timestamps, card counts and recall ratings are stored on the server for up to 90 days. Email ownership is not verified. You may use TraceCard AI without claiming a code.</p></div><div class="generate-controls">
     <div class="tc-gen-field tc-gen-field--question">
      <span class="tc-gen-label" id="questionType-label">Cards type</span>
      <select id="questionType" aria-labelledby="questionType-label"><option value="mixed">Mixed Review (Default)</option><option value="mcq">Multiple Choice Only</option><option value="identification">Identification Only</option><option value="enumeration">Enumeration Only</option><option value="fillblank">Fill in the Blank Only</option></select>
@@ -4073,7 +4086,7 @@ function tcBgImportCompletedSets(payload,job){
   const shuffledSet=[];
   for(const card of list){
    const opts=card.type==='mcq'?tcShuffleGeneratedMcqChoices(card.opts,card.a,shuffledSet):card.opts;
-   shuffledSet.push({...card,opts,pdf:job.pdfName,id:uid(),deck:deckId,name,status:'pending',next:null});
+   shuffledSet.push({...card,opts,pdf:job.pdfName,id:uid(),deck:deckId,name,status:'pending',next:null,tcProofIndex:shuffledSet.length});
   }
   cards.push(...shuffledSet);
   count++;
@@ -4673,17 +4686,114 @@ function refreshReviewProgress(){
  const progress=document.getElementById('tcReviewProgress');
  if(progress)progress.outerHTML=reviewProgressMarkup();
 }
+// Research completion code: progress is verified by the server, never minted in LocalStorage.
+const tcProofLastKey=key+'research_completion_code_v1';
+const tcProofPendingKey=key+'research_pending_verification_v1';
+let tcProofPending=null;
+try{tcProofPending=JSON.parse(tcStore.getItem(tcProofPendingKey)||'null');}catch{}
+if(tcProofPending&&session?.tcProof&&tcProofPending.sessionId===session.tcProof.sessionId)tcProofPending=session.tcProof;
+const tcProofCodePattern=/^TC-(?:[A-F0-9]{5}-){3}[A-F0-9]{5}$/;
+const tcProofBusy=new WeakSet();
+function tcProofLast(){
+ try{const v=JSON.parse(tcStore.getItem(tcProofLastKey)||'null');return v&&v.claimed===true&&tcProofCodePattern.test(v.code)?v:null;}catch{return null;}
+}
+function tcProofInit(){
+ if(!session||session.tcProof||session.index!==0||session.ids.length<10||session.ids.length>30)return;
+ const m=/^background:([A-Za-z0-9_-]{32}):set:(\d+)$/.exec(session.deck||'');
+ if(!m||!window.crypto?.getRandomValues)return;
+ const list=session.ids.map(tcFindReviewCard);
+ if(list.some(c=>!c||c.status!=='approved'||c.deck!==session.deck||!Number.isInteger(c.tcProofIndex)))return;
+ const indices=list.map(c=>c.tcProofIndex);
+ if(new Set(indices).size!==indices.length)return;
+ const sessionId=Array.from(crypto.getRandomValues(new Uint8Array(16)),b=>b.toString(16).padStart(2,'0')).join('');
+ session.tcProof={sessionId,jobId:m[1],setNumber:Number(m[2]),indices,events:[],sent:0,started:false,code:'',error:''};
+ saveSessionOnly();
+}
+async function tcProofPost(path,body){
+ const controller=new AbortController(),timer=setTimeout(()=>controller.abort(),15000);
+ try{
+  const res=await fetch('/api/research/review/'+path,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body),signal:controller.signal,cache:'no-store'});
+  const data=await res.json();if(!res.ok||!data.ok)throw Error(data.error||'Verification temporarily unavailable.');return data;
+ }finally{clearTimeout(timer);}
+}
+function tcProofPersist(proof){
+ if(session?.tcProof===proof)saveSessionOnly();
+ if(proof.events.length===proof.indices.length){
+  if(proof.claimed){if(tcProofPending?.sessionId===proof.sessionId){tcProofPending=null;tcStore.removeItem(tcProofPendingKey);}}
+  else{tcProofPending=proof;tcStore.setItem(tcProofPendingKey,JSON.stringify(proof));}
+ }
+}
+async function tcProofSync(proof=session?.tcProof, retry=false){
+ if(!proof||proof.code||tcProofBusy.has(proof)||(!retry&&proof.error))return;
+ tcProofBusy.add(proof);proof.error='';tcProofUpdatePanel();
+ try{
+  if(!proof.started){
+   await tcProofPost('start',{jobId:proof.jobId,setNumber:proof.setNumber,sessionId:proof.sessionId,indices:proof.indices});
+   proof.started=true;tcProofPersist(proof);
+  }
+  while(proof.sent<proof.events.length){
+   const event=proof.events[proof.sent];
+   const result=await tcProofPost('event',{sessionId:proof.sessionId,jobId:proof.jobId,index:event.index,answer:event.answer,rating:event.rating});
+   proof.sent++;event.answer='';
+   if(tcProofCodePattern.test(result.code||'')){
+    proof.code=result.code; // Claim with survey email before displaying the code.
+   }
+   tcProofPersist(proof);
+  }
+ }catch(e){proof.error=e?.message||'Verification unavailable.';tcProofPersist(proof);}
+ finally{tcProofBusy.delete(proof);tcProofUpdatePanel();}
+}
+function tcProofRecord(card,answered,rating){
+ const proof=session?.tcProof;
+ if(!proof||proof.code||card.deck!==session.deck||!proof.indices.includes(card.tcProofIndex)||proof.events.some(e=>e.index===card.tcProofIndex))return;
+ proof.events.push({index:card.tcProofIndex,answer:String(answered.answer||''),rating});
+ if(proof.events.length===proof.indices.length){tcProofPending=proof;tcStore.setItem(tcProofPendingKey,JSON.stringify(proof));}
+ // The normal review save persists this outbox before network synchronization.
+}
+function tcProofMarkup(){return '<div id="tcResearchCompletion" class="box tc-research-completion" hidden aria-live="polite"></div>';}
+function tcProofUpdatePanel(){
+ const panel=$('tcResearchCompletion');if(!panel)return;
+ const proof=session?.tcProof||tcProofPending,last=tcProofLast();
+ const code=proof ? (proof.claimed?proof.code:'') : last?.code;
+ panel.hidden=false;
+ if(code){
+  panel.innerHTML=`<h3>Activity Completed!</h3><p>Your participation has been verified. Copy this code and enter it in the research survey.</p><div class="tc-research-code">${safe(code)}</div><button type="button" id="tcCopyCompletionCode">Copy Completion Code</button><p id="tcCopyCompletionStatus" role="status"></p><small>Keep this code private. One code may be used for one survey entry.</small>`;
+  $('tcCopyCompletionCode').onclick=async()=>{
+   try{await navigator.clipboard.writeText(code);$('tcCopyCompletionStatus').textContent='Completion code copied.';}
+   catch{$('tcCopyCompletionStatus').textContent='Select and copy the code manually.';}
+  };
+ }else if(proof?.code){
+  panel.innerHTML=`<h3>Activity Completed!</h3><p>Enter the same student email you will use in the research survey to claim your completion code. This is optional for ordinary app use.</p><form id="tcResearchClaimForm"><label class="tc-research-email">Student Email<input id="tcResearchEmail" type="email" maxlength="254" autocomplete="email" required placeholder="Enter your student email"></label><button type="submit" id="tcResearchClaimButton">Claim Completion Code</button><p id="tcResearchClaimStatus" role="status"></p></form><small>Your email and activity verification record are retained for up to 90 days. Your score does not affect eligibility.</small>`;
+  $('tcResearchClaimForm').onsubmit=async event=>{
+   event.preventDefault();const button=$('tcResearchClaimButton'),status=$('tcResearchClaimStatus');
+   if(button.disabled)return;button.disabled=true;status.textContent='Claiming your code…';
+   try{
+    const result=await tcProofPost('claim',{sessionId:proof.sessionId,jobId:proof.jobId,email:$('tcResearchEmail').value.trim()});
+    if(!tcProofCodePattern.test(result.code||''))throw Error('Invalid verification response. Please retry.');
+    proof.code=result.code;proof.claimed=true;tcStore.setItem(tcProofLastKey,JSON.stringify({code:proof.code,claimed:true,at:Date.now()}));
+    tcProofPersist(proof);tcProofUpdatePanel();
+   }catch(e){status.textContent=e?.message||'Could not claim your code. Please retry.';button.disabled=false;}
+  };
+ }else if(proof){
+  if(proof.events.length!==proof.indices.length){panel.innerHTML='<h3>Research participation</h3><p>Complete a full review of at least 10 approved cards in one generated set to receive a completion code.</p>';return;}
+  panel.innerHTML=`<h3>Research participation</h3><p>${proof.error?safe(proof.error):'Verifying your completed review…'}</p>${proof.error?'<button type="button" id="tcRetryCompletionCode">Retry Verification</button>':''}`;
+  if($('tcRetryCompletionCode'))$('tcRetryCompletionCode').onclick=()=>tcProofSync(proof,true);
+ }else if(session){panel.innerHTML='<h3>Research participation</h3><p>To receive a completion code, generate a new set using the updated system, approve at least 10 cards and complete their review.</p>';}
+ else panel.hidden=true;
+}
+window.addEventListener('online',()=>{tcProofSync(session?.tcProof,true);if(tcProofPending!==session?.tcProof)tcProofSync(tcProofPending,true);});
 let tcReviewCompletionAnimationPending=false;
 function drawReview(){
  if(!session){
   const first=due()[0];
   if(first){session={deck:first.deck,ids:due().filter(c=>c.deck===first.deck).map(c=>c.id),index:0,answers:{},results:{}};saveSessionOnly();}
  }
- if(!session){$('quiz').textContent='No approved cards due for review.';return;}
+ if(!session){$('quiz').textContent='No approved cards due for review.';if(tcProofLast()||tcProofPending){$('quiz').insertAdjacentHTML('beforeend',tcProofMarkup());tcProofUpdatePanel();tcProofSync(tcProofPending);}return;}
  if(!Array.isArray(session.ids)){session=null;saveSessionOnly();$('quiz').textContent='No valid review session.';return;}
  session.answers=session.answers||{};
  session.results=session.results||{};
  session.index=Math.max(0,Number(session.index)||0);
+ tcProofInit();if(session?.tcProof?.code&&!session.tcProof.claimed)tcProofPersist(session.tcProof);tcProofSync();if(tcProofPending!==session?.tcProof)tcProofSync(tcProofPending);
  while(session.index<session.ids.length){
   const id=session.ids[session.index],c=tcFindReviewCard(id);
   if(c&&c.status==='approved'&&(
@@ -4701,7 +4811,8 @@ function drawReview(){
    ${animate?'<div class="tc-review-complete-animation"><span class="tc-review-complete-check" aria-hidden="true">✓</span><span>Review completed!</span></div>':''}
    <h3>Set Review Complete!</h3><p><b>${correctCount}/${session.ids.length} correct</b> · ${session.ids.length} questions reviewed.</p>
    ${next?`<p><b>Next Review:</b> ${safe(formatDate(next))}</p>`:''}
-   <div class="actions"><button onclick="show('history')">View History</button><button onclick="session=null;save();show('review')">Review Other Due Cards</button>${next?`<button onclick="calendarEvent()">Add Review Dates to Google Calendar</button>`:''}</div></div>`;
+   <div class="actions"><button onclick="show('history')">View History</button><button onclick="session=null;save();show('review')">Review Other Due Cards</button>${next?`<button onclick="calendarEvent()">Add Review Dates to Google Calendar</button>`:''}</div></div>`+tcProofMarkup();
+  tcProofUpdatePanel();
   return;
  }
  const c=tcFindReviewCard(session.ids[session.index]);if(!c)return;
@@ -4819,9 +4930,11 @@ function rate(id,rating,days){
  logs.unshift({cardId:c.id,deck:c.deck,q:c.q,opts:[...(c.opts||[])],type:cardType(c),correctAnswer:c.a,userAnswer:answered.answer,rating,correct:answered.correct,date:now.toISOString(),next:c.next});
  session.results=session.results||{};
  session.results[id]=answered.correct;
+ tcProofRecord(c,answered,rating);
  session.index++;delete session.answers[id];
  if(session.index>=session.ids.length)tcReviewCompletionAnimationPending=true;
  save();
+ tcProofSync();
 }
 
 // HISTORY
@@ -4832,7 +4945,7 @@ async function clearReviewHistory(){
  if(!await tcConfirmClear({
   title:'Clear Review History?',
   description:'This permanently deletes your review answers, scores, next-review schedules, and saved Review History on this device.',
-  kept:'Your generated flashcards, approved sets, and Recent Activity will be kept. Current approved cards can be reviewed again.',
+  kept:'Your generated flashcards, approved sets, and Recent Activity will be kept. Current approved cards can be reviewed again. Research verification records are not deleted by clearing local history.',
   confirmLabel:'Clear Review History'
  }))return;
  // Review History owns saved ratings and their next-review dates.
@@ -4847,7 +4960,7 @@ async function clearReviewHistory(){
  historyDeck='';historyCard='';historyFilter='all';historySearchQuery='';historySearchOrigin=false;
  const input=$('historySearchInput');if(input)input.value='';
  save();
- tcShowApprovalToast('Review History, scores, and next-review schedules cleared. Generated flashcards were kept.');
+ // Clear Review History silently; retain the confirmation dialog.
 }
 
 function latestResults(deck){
