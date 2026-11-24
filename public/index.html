@@ -1974,7 +1974,11 @@ body[data-theme="dark"] .tc-gen-progress-note{color:#b7d6ed}
 .tc-approval-toast{position:fixed;right:20px;bottom:22px;z-index:10000;display:flex;gap:10px;align-items:center;max-width:min(420px,calc(100vw - 32px));border-radius:15px;padding:12px 17px;background:#eaf7ff;border:1px solid #92caef;color:#123c60;box-shadow:0 9px 28px rgba(4,68,123,.17);font-size:14px;font-weight:700;pointer-events:none;animation:tc-toast-enter .35s ease-out}
 .tc-approval-toast[hidden]{display:none!important}
 .tc-approval-toast .tc-toast-check{width:26px;height:26px;display:grid;place-items:center;border-radius:50%;background:#138bd6;color:#fff;animation:tc-check-pop .42s both}
+.tc-approval-toast.is-rejected{background:#fff0f3;border-color:#f1a3b0;color:#8c2236}
+.tc-approval-toast.is-rejected .tc-toast-check{background:#e0526a}
 body[data-theme="dark"] .tc-approval-toast{background:#173650;color:#f3faff;border-color:#4385b2}
+body[data-theme="dark"] .tc-approval-toast.is-rejected{background:#432130;color:#ffeef2;border-color:#925066}
+body[data-theme="dark"] .tc-approval-toast.is-rejected .tc-toast-check{background:#e4647b}
 @keyframes tc-toast-enter{from{opacity:0;transform:translateY(12px)}to{opacity:1;transform:translateY(0)}}
 @keyframes tc-check-pop{0%{transform:scale(.3)}75%{transform:scale(1.14)}100%{transform:scale(1)}}
 .tc-review-completed .tc-review-complete-animation{display:flex;gap:10px;align-items:center;font-size:19px;font-weight:800;color:#1688d1;margin-bottom:14px;animation:tc-toast-enter .45s both}
@@ -3073,6 +3077,7 @@ body[data-theme="dark"] #settings button.tc-setting-switch[aria-checked="true"]:
 /* Center the Settings title vertically beside its icon on all screen sizes. */
 #settings > .page-heading { align-items: center; }
 </style>
+<style id="tc-empty-generation-messages">#info:empty,#uploadSummary:empty,#tcGenProgressNote:empty{display:none!important}</style>
 </head>
 <body data-theme="light">
 
@@ -4062,12 +4067,17 @@ function tcUpdateCancelButton(){
 }
 
 let tcToastTimer=null;
-function tcShowApprovalToast(message){
+function tcShowApprovalToast(message,variant='approved'){
  const toast=$('tcApprovalToast');if(!toast)return;
  clearTimeout(tcToastTimer);
+ const rejected=variant==='rejected';
+ toast.classList.toggle('is-rejected',rejected);
+ $('tcApprovalToastIcon').innerHTML=rejected
+  ?'<svg viewBox="0 0 24 24" focusable="false"><path d="M8 8l8 8M16 8l-8 8"/></svg>'
+  :'<svg viewBox="0 0 24 24" focusable="false"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg>';
  $('tcApprovalToastText').textContent=message;
  toast.hidden=false;
- // Restart the confirmation animation only when the user explicitly approves.
+ // Restart the confirmation animation when the user confirms an action.
  toast.style.animation='none';void toast.offsetWidth;toast.style.animation='';
  tcToastTimer=setTimeout(()=>{toast.hidden=true},2300);
 }
@@ -4099,7 +4109,7 @@ function tcProgressDisplay(saved,total,phase='working',detail=''){
   }
   $('tcGenProgressNote').textContent=`Set ${currentSet}/${sets}: ${inSet}/${perSet} Generating Flashcards`;
  }else{
-  $('tcGenProgressNote').textContent=detail||'Only valid flashcards that were saved are counted.';
+  $('tcGenProgressNote').textContent=detail||(phase==='complete'?'':'Only valid flashcards that were saved are counted.');
  }
 }
 function tcSavedDraftSummary(){
@@ -4346,9 +4356,9 @@ async function tcBgCheckStatus(){
   if(status==='completed'||status==='succeeded'||status==='done'){
    const importedSets=Array.from({length:job.sets},(_,i)=>`background:${job.id}:set:${i+1}`).filter(d=>cards.some(c=>c.deck===d)||tcDeletedDecks().has(d)).length;
    if(importedSets===job.sets){
-    tcProgressDisplay(total,total,'complete','Background generation finished. Opening Flashcard Sets for validation.');
+    tcProgressDisplay(total,total,'complete');
     tcBgAlert('Flashcards ready',`${job.sets} set(s) finished. Your flashcards are saved on this device.`,false);
-    $('info').textContent='Background generation complete. Flashcard Sets opened automatically for validation.';
+    $('info').textContent='';
     tcBgRemember(null);tcBgStopPolling();tcBgBusy(false);
     // After a complete and successfully imported background job (including on
     // return from another app), open the pending flashcards for validation.
@@ -4744,6 +4754,7 @@ function change(id,status){
 
  save();
  if(newlyApproved)tcShowApprovalToast('Flashcard approved and saved!');
+ if(status==='rejected')tcShowApprovalToast('Flashcard rejected.', 'rejected');
 }
 
 // Custom flashcard action dialogs: preserve the original card until the user confirms.
@@ -4783,6 +4794,7 @@ function rejectSet(deck){
   cards.filter(c=>c.deck===deck).forEach(c=>c.status='rejected');
   if(session?.deck===deck)session=null;
   opened='';save();
+  tcShowApprovalToast('Flashcards rejected.', 'rejected');
  }});
 }
 
@@ -5183,14 +5195,17 @@ function rate(id,rating,days){
 // HISTORY
 
 async function clearReviewHistory(skipConfirm=false){
- const hasHistory=logs.length>0||archivedCards.length>0||cards.some(c=>c.next)||!!(session&&Object.keys(session.answers||{}).length);
- if(!hasHistory&&!skipConfirm)return;
+ // Always show the same final confirmation as Clear Generated Data,
+ // even when there is no saved review history yet.
  if(!skipConfirm&&!await tcConfirmClear({
   title:'Clear Review History?',
-  description:'This permanently deletes your review answers, scores, next-review schedules, and saved Review History on this device.',
-  kept:'Your flashcards, Recent Activity, and research verification records will be kept. You can review approved cards again.',
-  confirmLabel:'Clear Review History'
+  description:'All review history, answers, scores, and review schedules will be deleted. This cannot be undone.',
+  kept:'',
+  confirmLabel:'Clear Review History',
+  cancelLabel:'Keep My Data'
  }))return;
+ const hasHistory=logs.length>0||archivedCards.length>0||cards.some(c=>c.next)||!!(session&&Object.keys(session.answers||{}).length);
+ if(!hasHistory&&!skipConfirm)return;
  // Review History owns saved ratings and their next-review dates.
  // Reset schedules on still-generated cards, and remove archived-only review cards.
  cards.forEach(c=>{if(c.status==='approved')c.next=null;});
@@ -6016,7 +6031,7 @@ document.querySelectorAll('.tc-header-icon[data-page]').forEach(button=>{
 })();
 
 </script>
-<div id="tcApprovalToast" class="tc-approval-toast" role="status" aria-live="polite" hidden><span class="tc-toast-check" aria-hidden="true"><svg viewBox="0 0 24 24" focusable="false"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg></span><span id="tcApprovalToastText">Flashcards approved</span></div>
+<div id="tcApprovalToast" class="tc-approval-toast" role="status" aria-live="polite" hidden><span id="tcApprovalToastIcon" class="tc-toast-check" aria-hidden="true"><svg viewBox="0 0 24 24" focusable="false"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg></span><span id="tcApprovalToastText">Flashcards approved</span></div>
 
 
 <script id="tc-getting-started-slideshow-script-v2">
