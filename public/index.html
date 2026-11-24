@@ -4478,7 +4478,7 @@ $('clear').onclick=async()=>{
  if(!await tcConfirmClear({
   title:'Clear Generated Data?',
   description:'All generated flashcards and related files will be deleted. This cannot be undone.',
-  kept:'Review History, answers, scores, and upcoming review schedules will be kept. PDFs needed for saved review questions will also stay in this browser. To remove review data, use Clear Review History.',
+  kept:'Your Review History, answers, scores, schedules, and required PDFs will be kept. To remove review data, use Clear Review History.',
   confirmLabel:'Clear Generated Data',
   cancelLabel:'Keep My Data'
  }))return;
@@ -4992,7 +4992,7 @@ async function clearReviewHistory(){
  if(!await tcConfirmClear({
   title:'Clear Review History?',
   description:'This permanently deletes your review answers, scores, next-review schedules, and saved Review History on this device.',
-  kept:'Your generated flashcards, approved sets, and Recent Activity will be kept. Current approved cards can be reviewed again. Research verification records are not deleted by clearing local history.',
+  kept:'Your flashcards, Recent Activity, and research verification records will be kept. You can review approved cards again.',
   confirmLabel:'Clear Review History'
  }))return;
  // Review History owns saved ratings and their next-review dates.
@@ -5083,7 +5083,8 @@ function drawHistory(){
  const historyCards=[...archivedCards.filter(a=>!cards.some(c=>c.id===a.id)),...cards];
  const searchIndicator=$('historySearchActive');
  if(searchIndicator)searchIndicator.hidden=!historySearchQuery;
-
+ // A newly approved set is not a completed review. With no recorded answers,
+ // History must visibly be empty after clearing, while approved cards remain.
  const hasRecordedAnswers=logs.length>0||Boolean(session&&Object.keys(session.answers||{}).length);
  if(!hasRecordedAnswers){
   historyDeck='';historyCard='';historyFilter='all';historySearchOrigin=false;
@@ -5249,7 +5250,7 @@ async function viewSource(id){
  catch(err){return alert(err.message);}
 
  $('reader').hidden=false;
-
+ // Only change the displayed filename; keep the raw name for PDF matching.
  const displayName=String(c.pdf||'PDF').replace(/\+/g,' ');
  let readableName=displayName;
  try{readableName=decodeURIComponent(displayName);}catch(_){}
@@ -5351,7 +5352,6 @@ document.addEventListener('visibilitychange',()=>{
  }
 });
 
-
 function tcBellRatingOrder(){return ['Remembered','Partially Remembered','Difficult','Other scheduled reviews'];}
 function tcBellRatingMap(){
  const latest=new Map();
@@ -5450,7 +5450,8 @@ function tcRenderBellSchedule(){
   row.title=isDue?'Open due questions':'Review ahead of schedule or keep the date';
   target.appendChild(row);
  }
- 
+ // The orange action remains usable when only upcoming cards exist.
+ // It never erases an unfinished session or review history.
  $('bellReview').disabled=false;
  $('bellReview').textContent=dueNow?'Open Due Review':'Choose Review Date';
 }function renderDashboardStats(){
@@ -5509,7 +5510,7 @@ function updateSearch(){
 $('siteSearch').addEventListener('input',updateSearch);
 document.addEventListener('keydown',(e)=>{if((e.ctrlKey||e.metaKey)&&e.key==='/'){e.preventDefault();$('siteSearch').focus();}if(e.key==='Escape'){$('searchResults').classList.remove('show');$('bellPopover').classList.remove('show');$('profilePopover').classList.remove('show');closeSidebar();}});
 document.addEventListener('click',(e)=>{if(!e.target.closest('.search-wrap'))$('searchResults').classList.remove('show');if(!e.target.closest('.top-popovers')){$('bellPopover').classList.remove('show');$('profilePopover').classList.remove('show');}});
-// A single delegated handler works even after reminder cards are rerendered.
+
 $('bellMessage').addEventListener('click',event=>{
  const row=event.target.closest('.tc-bell-row');
  if(row&&$('bellMessage').contains(row)){
@@ -5552,7 +5553,6 @@ tcBgRefreshReadyBell();
 tcBgRestoreAfterLoad();
 tcUpdateCancelButton();
 
-// Header controls share the existing theme and navigation logic.
 document.getElementById('headerThemeToggle')?.addEventListener('click',()=>{
  applyTheme(document.body.getAttribute('data-theme')==='dark'?'light':'dark');
 });
@@ -5565,10 +5565,9 @@ document.querySelectorAll('.tc-header-icon[data-page]').forEach(button=>{
 });
 
 
-// Keep resumable progress in sync with changed generation settings.
 ['questionType','count','cardAmount'].forEach(id=>$(id).addEventListener('change',tcSavedDraftSummary));
 
-// Three themed dropdowns. The original <select> elements remain the source of truth for generation.
+
 (function setupGenerationDropdowns(){
  const ids=['questionType','count','cardAmount'];
  const controls=[];
@@ -5751,7 +5750,7 @@ document.querySelectorAll('.tc-header-icon[data-page]').forEach(button=>{
    panel.addEventListener('mouseenter',()=>{if(canHover){hovered=true;stop();}});
    panel.addEventListener('mouseleave',()=>{if(canHover){hovered=false;start();}});
    document.addEventListener('visibilitychange',()=>{if(document.hidden)stop();else start();});
- 
+
    new MutationObserver(()=>{if(section.classList.contains('active'))start();else stop();})
     .observe(section,{attributes:true,attributeFilter:['class']});
    showImmediately(0);
