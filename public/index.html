@@ -2829,6 +2829,10 @@ body[data-theme="dark"] #tcGeneratedReadyBell:hover{background:#22503d}
 #tcManageDataDialog{margin:auto;max-width:calc(100% - 36px);max-height:calc(100dvh - 36px)}
 #tcManageDataDialog::backdrop{background:rgba(9,18,43,.65)}
 #tcManageDataDialog:not([open]){display:none}
+#tcManageDataDialog .tc-manage-header{display:flex;align-items:center;gap:14px;margin:0 0 14px}
+#tcManageDataDialog .tc-manage-header .tc-clear-icon{flex:0 0 44px;width:44px;height:44px;border-radius:13px;margin:0}
+#tcManageDataDialog .tc-manage-header .tc-clear-icon svg{width:24px;height:24px}
+#tcManageDataDialog .tc-manage-header h2{margin:0;min-width:0}
 #tcManageDataDialog .tc-manage-option{display:flex;align-items:flex-start;gap:12px;border:1px solid #dce5f0;border-radius:12px;padding:13px;margin:0 0 10px;cursor:pointer;color:inherit;background:transparent}
 #tcManageDataDialog .tc-manage-option span{display:grid;gap:4px;min-width:0}
 #tcManageDataDialog .tc-manage-option small{font-size:12px;line-height:1.5;color:#51647c}
@@ -2928,6 +2932,20 @@ body[data-theme="dark"] #tcCardDialog #tcCardModalError{color:#ffacb7!important}
 #historyContent .tc-history-set-date{font-size:13px;font-weight:400;color:var(--tc-body,var(--muted));}
 #historyContent .tc-history-set-arrow{flex:0 0 auto;color:inherit;}
 @media(max-width:520px){#historyContent .history-row{gap:12px;padding:16px;}#historyContent .history-row .history-score{min-width:40px;font-size:17px;}#historyContent .tc-history-set-number{font-size:13px;}#historyContent .tc-history-set-date{font-size:12px;}}
+</style>
+<style id="tc-history-selective-delete-style">
+#history #tcHistoryDeleteToggle{width:42px;min-height:42px;padding:9px;flex:0 0 auto;color:#bd4653;border-color:#eccbd0;background:#fff4f4}
+#history #tcHistoryDeleteToggle svg{width:20px;height:20px}
+#history #tcHistoryDeleteToggle:disabled,#history #historySearchToggle:disabled{opacity:.5;cursor:not-allowed}
+#history .tc-history-selection-bar{display:flex;align-items:center;gap:10px;margin:0 0 4px;font-weight:600}
+#history .tc-history-selection-bar input,#history .tc-history-select-row input{appearance:auto!important;width:20px!important;height:20px!important;min-width:20px;flex:0 0 20px;margin:0;accent-color:#1687c9;cursor:pointer;box-shadow:none!important}
+#history .tc-history-select-row{cursor:pointer;display:flex;align-items:center}
+#history .tc-history-select-row:has(input:checked){border-color:#1687c9;box-shadow:0 0 0 1px #1687c9}
+#history .tc-history-selection-footer{display:flex;flex-direction:column;gap:10px;margin-top:4px;color:inherit}
+#history .tc-history-delete-selected{width:100%;border:1px solid #c83c4e;background:#c83c4e;color:white;border-radius:12px;padding:12px;font:inherit;font-weight:700;cursor:pointer}
+#history .tc-history-delete-selected:disabled{opacity:.48;cursor:not-allowed}
+body[data-theme="dark"] #history #tcHistoryDeleteToggle{color:#ffb2bc;background:#3d2839;border-color:#68424f}
+body[data-theme="dark"] #history .tc-history-delete-selected{background:#c33f54;border-color:#c33f54}
 </style>
 <style id="tc-rated-review-notifications">
 #tcGeneratedReadyBell .tc-ready-pdf-title{font-weight:700;overflow-wrap:anywhere;max-width:100%;white-space:normal;}
@@ -3120,10 +3138,10 @@ body[data-theme="dark"] #settings button.tc-setting-switch[aria-checked="true"]:
 <section id="review"><button class="tc-back" onclick="appBack()"><svg class="tc-back-arrow" viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M19 12H5m7-7-7 7 7 7" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg><span>Back</span></button><div class="page-heading"><div class="page-heading-icon"><svg class="icon" aria-hidden="true"><use href="#i-calendar"></use></svg></div><div><h1>Review</h1></div></div><div class="content-stack" id="quiz"></div></section>
 <section id="history"><button class="tc-back" onclick="appBack()"><svg class="tc-back-arrow" viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M19 12H5m7-7-7 7 7 7" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg><span>Back</span></button>
 <div class="page-heading tc-history-heading"><div class="page-heading-icon"><svg class="icon" aria-hidden="true"><use href="#i-history"></use></svg></div><div class="tc-history-heading-copy"><h1>Review History</h1></div>
-<div class="tc-history-tools"><button type="button" id="historySearchToggle" class="tc-history-search-toggle" aria-controls="historySearchPanel" aria-expanded="false" onclick="toggleHistorySearch()"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 6h16M4 12h16M4 18h16"/><circle cx="9" cy="6" r="2.5" fill="var(--tc-history-button-bg,#fff)"/><circle cx="16" cy="12" r="2.5" fill="var(--tc-history-button-bg,#fff)"/><circle cx="10" cy="18" r="2.5" fill="var(--tc-history-button-bg,#fff)"/></svg><span>Search &amp; Filters</span><span class="tc-history-search-active" id="historySearchActive" hidden></span></button></div></div>
+<div class="tc-history-tools"><button type="button" id="historySearchToggle" class="tc-history-search-toggle" aria-controls="historySearchPanel" aria-expanded="false" onclick="toggleHistorySearch()"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 6h16M4 12h16M4 18h16"/><circle cx="9" cy="6" r="2.5" fill="var(--tc-history-button-bg,#fff)"/><circle cx="16" cy="12" r="2.5" fill="var(--tc-history-button-bg,#fff)"/><circle cx="10" cy="18" r="2.5" fill="var(--tc-history-button-bg,#fff)"/></svg><span>Search &amp; Filters</span><span class="tc-history-search-active" id="historySearchActive" hidden></span></button><button type="button" id="tcHistoryDeleteToggle" class="tc-history-clear-btn" aria-label="Select sets to delete" title="Select sets to delete" aria-pressed="false" onclick="tcHistoryToggleDelete()"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 6h18M8 6V4h8v2m3 0-1 14H6L5 6m5 4v6m4-6v6"/></svg></button></div></div>
 <div id="historySearchPanel" class="tc-history-search-panel" hidden><div class="tc-history-search-field"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="m16 16 5 5"/></svg><input id="historySearchInput" type="search" placeholder="Type a title, topic or question" autocomplete="off" oninput="searchReviewHistory(this.value)" aria-label="Search review history by title, topic or question"><button type="button" id="historySearchClear" onclick="clearHistorySearchQuery()">Clear</button></div></div>
 <div class="content-stack" id="historyContent"></div></section>
-<section id="settings"><div class="page-heading"><div class="page-heading-icon"><svg class="icon" aria-hidden="true"><use href="#i-settings"></use></svg></div><div><h1>Settings</h1><p>Review notifications, calendar schedules, and local data.</p></div></div><div class="panel settings-panel"><div class="setting-block"><div class="tc-setting-switch-row"><div class="tc-setting-switch-copy"><h3 id="tcNotificationsLabel">Review Notifications</h3><p id="tcNotificationsDescription">Get alerts when flashcards are due while this website is open.</p></div><button type="button" class="tc-setting-switch" id="enableNotifications" role="switch" aria-checked="false" aria-labelledby="tcNotificationsLabel" aria-describedby="tcNotificationsDescription notificationStatus"><span aria-hidden="true"></span></button></div><small id="notificationStatus" role="status"></small></div><div class="setting-block"><div class="tc-setting-switch-row"><div class="tc-setting-switch-copy"><h3 id="tcCalendarLabel">Google Calendar</h3><p id="tcCalendarDescription">Show review dates to add to Google Calendar.</p></div><button type="button" class="tc-setting-switch" id="calendarNext" role="switch" aria-checked="false" aria-labelledby="tcCalendarLabel" aria-describedby="tcCalendarDescription" aria-controls="tcSettingsCalendarDates"><span aria-hidden="true"></span></button></div><div id="tcSettingsCalendarDates" hidden></div></div><div class="setting-block"><h3>Data Management</h3><p>Delete generated flashcards or review history.</p><div class="reminder-actions"><button type="button" id="tcManageDataOpen" aria-haspopup="dialog"><svg class="icon" aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18M8 6V4h8v2m3 0-1 14H6L5 6m5 4v6m4-6v6"/></svg>Clear Data</button></div></div></div></section>
+<section id="settings"><div class="page-heading"><div class="page-heading-icon"><svg class="icon" aria-hidden="true"><use href="#i-settings"></use></svg></div><div><h1>Settings</h1></div></div><div class="panel settings-panel"><div class="setting-block"><div class="tc-setting-switch-row"><div class="tc-setting-switch-copy"><h3 id="tcNotificationsLabel">Review Notifications</h3><p id="tcNotificationsDescription">Get alerts when flashcards are due while this website is open.</p></div><button type="button" class="tc-setting-switch" id="enableNotifications" role="switch" aria-checked="false" aria-labelledby="tcNotificationsLabel" aria-describedby="tcNotificationsDescription notificationStatus"><span aria-hidden="true"></span></button></div><small id="notificationStatus" role="status"></small></div><div class="setting-block"><div class="tc-setting-switch-row"><div class="tc-setting-switch-copy"><h3 id="tcCalendarLabel">Google Calendar</h3><p id="tcCalendarDescription">Show review dates to add to Google Calendar.</p></div><button type="button" class="tc-setting-switch" id="calendarNext" role="switch" aria-checked="false" aria-labelledby="tcCalendarLabel" aria-describedby="tcCalendarDescription" aria-controls="tcSettingsCalendarDates"><span aria-hidden="true"></span></button></div><div id="tcSettingsCalendarDates" hidden></div></div><div class="setting-block"><h3>Data Management</h3><p>Delete generated flashcards or review history.</p><div class="reminder-actions"><button type="button" id="tcManageDataOpen" aria-haspopup="dialog"><svg class="icon" aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18M8 6V4h8v2m3 0-1 14H6L5 6m5 4v6m4-6v6"/></svg>Clear Data</button></div></div></div></section>
 <section id="help">
   <div class="page-heading">
     <div class="page-heading-icon"><svg class="icon" aria-hidden="true"><use href="#i-help"></use></svg></div>
@@ -3214,8 +3232,10 @@ body[data-theme="dark"] #settings button.tc-setting-switch[aria-checked="true"]:
 </dialog>
 
 <dialog id="tcManageDataDialog" class="tc-clear-dialog tc-manage-dialog" aria-labelledby="tcManageDataTitle" aria-describedby="tcManageDataDesc">
-  <div class="tc-clear-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M3 6h18M8 6V4h8v2m3 0-1 14H6L5 6m5 4v6m4-6v6"/></svg></div>
-  <h2 id="tcManageDataTitle">Manage Data</h2>
+  <div class="tc-manage-header">
+    <div class="tc-clear-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M3 6h18M8 6V4h8v2m3 0-1 14H6L5 6m5 4v6m4-6v6"/></svg></div>
+    <h2 id="tcManageDataTitle">Manage Data</h2>
+  </div>
   <p id="tcManageDataDesc" class="tc-clear-message">Select the data you want to delete.</p>
   <label class="tc-manage-option"><input type="checkbox" id="tcManageGenerated"><span><strong>Generated Data</strong><small>Generated flashcards, drafts, and Recent Activity.</small></span></label>
   <label class="tc-manage-option"><input type="checkbox" id="tcManageHistory"><span><strong>Review History</strong><small>Review answers, scores, and review schedules.</small></span></label>
@@ -3342,6 +3362,11 @@ let session=JSON.parse(tcStore.getItem(key+'session')||'null');
 
 let pages=[],doc=null,fileName='',opened='';
 let historyDeck='',historyCard='',historyFilter='all',historySearchQuery='',historySearchOrigin=false;
+let tcHistorySelecting=false,tcHistoryDeleting=false;
+const tcHistorySelected=new Set();
+const tcDeletedDeckKey=key+'selectively_deleted_decks_v1';
+function tcDeletedDecks(){try{return new Set(JSON.parse(tcStore.getItem(tcDeletedDeckKey)||'[]'));}catch{return new Set();}}
+
 let currentPage='home',previousPages=[];let tcUtilityReturnPage='home';
 const cardType=c=>['identification','enumeration','fillblank'].includes(c?.type)?c.type:'mcq';
 const normalizeAnswer=v=>clean(v).toLocaleLowerCase().replace(/[^\p{L}\p{N} ]/gu,'').replace(/\s+/g,' ');
@@ -3500,6 +3525,7 @@ function show(page,back=false){
  }
  const changingTab=page!==currentPage;
  if(changingTab){
+  if(currentPage==='history'){tcHistorySelecting=false;tcHistorySelected.clear();}
   tcPageScrollPositions[currentPage]=Math.max(0,window.scrollY||document.documentElement.scrollTop||0);
   if(!back)previousPages.push(currentPage);
   currentPage=page;
@@ -4264,7 +4290,7 @@ function tcBgImportCompletedSets(payload,job){
   if(!setNum)continue;
   if(set.completed!==true&&set.status!=='completed')continue;
   const deckId=`background:${job.id}:set:${setNum}`;
-  if(cards.some(c=>c.deck===deckId))continue; // idempotent across refresh/crashes
+  if(cards.some(c=>c.deck===deckId)||tcDeletedDecks().has(deckId))continue; // Never re-import a locally deleted set.
   const list=tcBgValidateCards(set.cards,job.cardsPerSet);
   if(!list){console.warn('[TraceCard AI] Background result not imported: invalid or incomplete set',setNum);continue;}
   const name=`Set ${setNum} - ${label}`;
@@ -4293,7 +4319,7 @@ async function tcBgCheckStatus(){
   const status=String(data.status||'queued').toLowerCase();
   const imported=tcBgImportCompletedSets(data,job);
   if(status==='completed'||status==='succeeded'||status==='done'){
-   const importedSets=Array.from({length:job.sets},(_,i)=>`background:${job.id}:set:${i+1}`).filter(d=>cards.some(c=>c.deck===d)).length;
+   const importedSets=Array.from({length:job.sets},(_,i)=>`background:${job.id}:set:${i+1}`).filter(d=>cards.some(c=>c.deck===d)||tcDeletedDecks().has(d)).length;
    if(importedSets===job.sets){
     tcProgressDisplay(total,total,'complete','Background generation finished. Opening Flashcard Sets for validation.');
     tcBgAlert('Flashcards ready',`${job.sets} set(s) finished. Your flashcards are saved on this device.`,false);
@@ -5272,11 +5298,94 @@ function drawHistoryGlobalSearch(historyCards){
  }).join(''):'<div class="tc-history-no-results">No matching questions found. Try a different word from the question or answer.</div>');
 }
 
+function tcHistoryToggleDelete(){
+ if(tcHistoryDeleting||tcClearPending)return;
+ tcHistorySelecting=!tcHistorySelecting;tcHistorySelected.clear();
+ if(tcHistorySelecting){
+  historyDeck='';historyCard='';historySearchQuery='';historyFilter='all';historySearchOrigin=false;
+  $('historySearchInput').value='';$('historySearchPanel').hidden=true;$('historySearchToggle').setAttribute('aria-expanded','false');
+ }
+ drawHistory();
+}
+function tcHistorySelectionUI(historyCards,ds){
+ const content=$('historyContent');
+ const available=new Set(ds);
+ for(const deck of tcHistorySelected)if(!available.has(deck))tcHistorySelected.delete(deck);
+ const selected=tcHistorySelected.size;
+ content.innerHTML=`<label class="tc-history-selection-bar"><input type="checkbox" id="tcHistorySelectAll" ${selected===ds.length&&ds.length?'checked':''} ${tcHistoryDeleting?'disabled':''}>Select All</label>`+
+ ds.map((d,i)=>{
+  const list=historyCards.filter(c=>c.deck===d&&c.status==='approved');
+  const meta=tcHistorySetMeta(list[0],i+1),results=latestResults(d),correct=list.filter(c=>results.get(c.id)?.correct===true).length;
+  return `<label class="history-row tc-history-select-row"><input type="checkbox" data-deck-index="${i}" ${tcHistorySelected.has(d)?'checked':''} ${tcHistoryDeleting?'disabled':''} aria-label="Select ${safe(meta.title+' '+meta.setLabel)}"><div class="tc-history-set-meta"><b class="tc-history-pdf-title">${safe(meta.title)}</b><span class="tc-history-set-number">${safe(meta.setLabel)}</span><span class="tc-history-set-date">${safe(meta.date)}</span></div><span class="history-score">${correct}/${list.length}</span></label>`;
+ }).join('')+`<div class="tc-history-selection-footer"><span>${selected} selected</span><button type="button" class="tc-history-delete-selected" id="tcHistoryDeleteSelected" ${!selected||tcHistoryDeleting?'disabled':''}>Delete Selected</button></div>`;
+ const all=$('tcHistorySelectAll');all.indeterminate=selected>0&&selected<ds.length;
+ all.onchange=()=>{tcHistorySelected.clear();if(all.checked)ds.forEach(d=>tcHistorySelected.add(d));drawHistory();};
+ content.querySelectorAll('[data-deck-index]').forEach(input=>input.onchange=()=>{const d=ds[Number(input.dataset.deckIndex)];if(input.checked)tcHistorySelected.add(d);else tcHistorySelected.delete(d);drawHistory();});
+ $('tcHistoryDeleteSelected').onclick=tcHistoryDeleteSelected;
+}
+async function tcHistoryDeleteSelected(){
+ if(tcHistoryDeleting||tcClearPending||!tcHistorySelected.size)return;
+ const chosen=new Set(tcHistorySelected);
+ const active=()=>tcManageGenerationActive()||tcGenerationRunning||tcBgChecking||tcManageBusy;
+ if(active()){alert('Finish or cancel generation before deleting selected sets.');return;}
+ tcHistoryDeleting=true;
+ try{
+  const count=chosen.size;
+  if(!await tcConfirmClear({title:'Delete selected sets?',description:`Permanently delete ${count} selected set${count===1?'':'s'}, their flashcards, Recent Activity, review results and schedules. This cannot be undone.`,kept:'Other sets, appearance settings and research verification records will be kept.',confirmLabel:'Delete Selected',cancelLabel:'Cancel'}))return;
+  if(active()){alert('Finish or cancel generation before deleting selected sets.');return;}
+  // Remember deleted server-backed sets so a failed-job status check cannot restore them.
+  const tombstones=tcDeletedDecks();for(const d of chosen)if(String(d).startsWith('background:'))tombstones.add(d);
+  tcStore.setItem(tcDeletedDeckKey,JSON.stringify([...tombstones]));
+  const removedCards=[...cards,...archivedCards].filter(c=>chosen.has(c.deck));
+  const removedIds=new Set(removedCards.map(c=>c.id));
+  cards=cards.filter(c=>!chosen.has(c.deck));
+  archivedCards=archivedCards.filter(c=>!chosen.has(c.deck));
+  logs=logs.filter(l=>!chosen.has(l.deck)&&!removedIds.has(l.cardId));
+  activityArchive=activityArchive.filter(r=>!chosen.has(r.deck));
+  if(session&&(chosen.has(session.deck)||(session.ids||[]).some(id=>removedIds.has(id))))session=null;
+  if(chosen.has(opened))opened='';
+  historyDeck='';historyCard='';historyFilter='all';historySearchOrigin=false;
+  // Update a still-pending generation notice only if its own batch was affected.
+  const notice=tcBgReadyNotice();
+  if(notice){
+   let affected=false,remaining=[];
+   if(!notice.id.startsWith('local:')){
+    const prefix=`background:${notice.id}:set:`;
+    affected=[...chosen].some(d=>String(d).startsWith(prefix));
+    remaining=cards.filter(c=>String(c.deck).startsWith(prefix)&&c.status==='pending');
+   }else{
+    const date=new Date(notice.id.slice(6));
+    if(!Number.isNaN(date.getTime())){
+     const label=date.toLocaleString('en-PH',{year:'numeric',month:'short',day:'numeric',hour:'numeric',minute:'2-digit'});
+     affected=removedCards.some(c=>c.pdf===notice.pdfName&&String(c.name||'').endsWith(' - '+label));
+     remaining=cards.filter(c=>c.pdf===notice.pdfName&&String(c.name||'').endsWith(' - '+label)&&c.status==='pending');
+    }
+   }
+   if(affected){
+    if(remaining.length)tcStore.setItem(tcBgReadyKey,JSON.stringify({...notice,total:remaining.length,setCount:new Set(remaining.map(c=>c.deck)).size}));
+    else tcStore.removeItem(tcBgReadyKey);
+    $('tcGeneratedCompleteToast').hidden=true;
+   }
+  }
+  tcHistorySelecting=false;tcHistorySelected.clear();save();tcBgRefreshReadyBell();
+  // Preserve PDFs still shared with other sets or the current upload.
+  try{await tcPruneStoredOriginalPdfs([...cards,...archivedCards].map(c=>c.pdf).concat(fileName));}catch(e){console.warn('Could not prune unused source PDFs:',e);}
+ }finally{tcHistoryDeleting=false;drawHistory();}
+}
 function drawHistory(){
  tcManageRefresh();
  const content=$('historyContent');
  const historyCards=[...archivedCards.filter(a=>!cards.some(c=>c.id===a.id)),...cards];
  const searchIndicator=$('historySearchActive');
+ const deleteToggle=$('tcHistoryDeleteToggle'),searchToggle=$('historySearchToggle');
+ const historyAvailable=(logs.length>0||Boolean(session&&Object.keys(session.answers||{}).length))&&historyDecks().length>0;
+ if(!historyAvailable){tcHistorySelecting=false;tcHistorySelected.clear();}
+ deleteToggle.disabled=!historyAvailable||tcHistoryDeleting;
+ deleteToggle.setAttribute('aria-pressed',String(tcHistorySelecting));
+ deleteToggle.setAttribute('aria-label',tcHistorySelecting?'Cancel selection':'Select sets to delete');
+ deleteToggle.title=tcHistorySelecting?'Cancel selection':'Select sets to delete';
+ deleteToggle.querySelector('svg').innerHTML=tcHistorySelecting?'<path d="m6 6 12 12M18 6 6 18"/>':'<path d="M3 6h18M8 6V4h8v2m3 0-1 14H6L5 6m5 4v6m4-6v6"/>';
+ searchToggle.disabled=tcHistorySelecting;
  if(searchIndicator)searchIndicator.hidden=!historySearchQuery;
  // A newly approved set is not a completed review. With no recorded answers,
  // History must visibly be empty after clearing, while approved cards remain.
@@ -5286,6 +5395,7 @@ function drawHistory(){
   content.textContent='No review history yet.';
   return;
  }
+ if(tcHistorySelecting){tcHistorySelectionUI(historyCards,historyDecks());return;}
  if(historySearchQuery&&!historyDeck){drawHistoryGlobalSearch(historyCards);return;}
 
 
