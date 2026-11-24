@@ -1,15 +1,12 @@
 'use strict';
 
-// Vercel supplies environment variables directly. Load .env only when available locally.
 try { require('dotenv').config(); } catch (error) {
   if (error?.code !== 'MODULE_NOT_FOUND') throw error;
 }
 const express = require('express');
 const path = require('path');
 const IS_VERCEL = Boolean(process.env.VERCEL);
-// Install @vercel/functions to keep work alive after an HTTP response.
-// Without it, status requests still resume a batch before responding.
-let vercelWaitUntil = null;
+
 if (IS_VERCEL) {
   try { vercelWaitUntil = require('@vercel/functions').waitUntil; }
   catch { console.warn('[TraceCard AI] Install @vercel/functions for background execution; using status-driven recovery.'); }
@@ -42,8 +39,7 @@ const PROVIDERS = [
   },
 ];
 
-// Fastest configured provider first by default. Customize without code changes:
-// AI_PROVIDER_ORDER=groq,gemini,openai,openrouter
+
 const preferredProviders=(process.env.AI_PROVIDER_ORDER || 'groq,gemini,openai,openrouter')
   .toLowerCase().split(',').map(x=>x.trim()).filter(Boolean);
 PROVIDERS.sort((a,b)=>{
@@ -143,9 +139,6 @@ function runQueue() {
   }
 }
 
-// Keep strict page + 10-160 character checks, but tolerate punctuation/dash differences.
-// Checking both forms handles "sodium-potassium" vs "sodium potassium" while
-// rejecting excerpts that are not actually present on the referenced PDF page.
 function normalizeExcerptText(value, punctuationAsSpace = false) {
   const text = String(value ?? '').normalize('NFKC').toLowerCase();
   const normalized = punctuationAsSpace
@@ -157,17 +150,17 @@ function sourceExcerptOnPage(pageText, excerpt) {
   if (typeof excerpt !== 'string' || excerpt.length < 10 || excerpt.length > 160 ||
       typeof pageText !== 'string') return false;
   const plainExcerpt = normalizeExcerptText(excerpt);
-  // Do not accept excerpts made of only punctuation/whitespace.
+
   if (plainExcerpt.replace(/\s/g, '').length < 8) return false;
   return normalizeExcerptText(pageText).includes(plainExcerpt) ||
     normalizeExcerptText(pageText, true).includes(normalizeExcerptText(excerpt, true));
 }
-// Validate excerpts against the matching PAGE N text in ordinary API prompts.
+
 function quotedInSource(prompt, page, excerpt) {
   if (typeof prompt !== 'string') return true;
   const marker = /^PAGE (\d+):\s*/gm;
   const spans = [...prompt.matchAll(marker)];
-  if (!spans.length) return true; // Legacy API calls without page-formatted source.
+  if (!spans.length) return true; 
   for (let i = 0; i < spans.length; i++) {
     if (Number(spans[i][1]) !== page) continue;
     const start = spans[i].index + spans[i][0].length;
@@ -199,7 +192,7 @@ function parseFlashcards(raw, requestedType = null, prompt = null, sourcePages =
     : Array.isArray(value?.cards) ? value.cards : null;
   if (!list?.length) throw new AIError('Provider returned no flashcards.', 502);
 
-  // Background jobs validate against the full PDF, not just the five-page prompt window.
+ 
   const pagesByNumber = Array.isArray(sourcePages)
     ? new Map(sourcePages.map(p => [p.page, p.text])) : null;
   const reasons = { format: 0, type: 0, answer: 0, source: 0 };
@@ -642,6 +635,7 @@ async function bgProcessBatch(job, signal = null) {
   const type = bgNextType(set, quota);
   if (!type) {
     set.status = 'completed';
+    set.completedAt = set.completedAt || Date.now();
     if (job.sets.every(s => s.status === 'completed')) job.status = 'completed';
     return 0;
   }
@@ -667,7 +661,7 @@ async function bgProcessBatch(job, signal = null) {
     used.add(card.question.trim().toLowerCase());
     added++;
   }
-  if (set.cards.length === job.cardsPerSet) set.status = 'completed';
+  if (set.cards.length === job.cardsPerSet) { set.status = 'completed'; set.completedAt = set.completedAt || Date.now(); }
   if (job.sets.every(s => s.status === 'completed')) {
     job.status = 'completed';
     job.message = 'All flashcards generated.';
@@ -900,6 +894,152 @@ app.get('/api/generation-jobs/:jobId', async (req, res) => {
     }
     return res.json(bgPublic(job));
   } catch (e) { return res.status(503).json({error:e?.message || 'Job status unavailable.'}); }
+});
+
+// Research participation verification (no account or additional AI calls).
+// Job IDs remain bearer capabilities; never expose them in the completion code.
+const TC_PROOF_PREFIX = 'tracecard:research:v1:';
+const TC_PROOF_TTL = 90 * 24 * 60 * 60;
+const TC_PROOF_MIN = 10;
+const tcProofSessionKey = id => TC_PROOF_PREFIX + 'session:' + id;
+const tcProofJobKey = id => TC_PROOF_PREFIX + 'job:' + id;
+const tcProofCodeKey = code => TC_PROOF_PREFIX + 'code:' + code;
+const tcProofID = id => typeof id === 'string' && /^[a-f0-9]{32}$/.test(id);
+const TC_PROOF_EVENT_SCRIPT = `
+local raw = redis.call('GET', KEYS[1])
+if not raw then return {'missing'} end
+local session = cjson.decode(raw)
+local idx = tonumber(ARGV[1])
+local pos = nil
+for i, v in ipairs(session.indices) do if v == idx then pos = i; break end end
+if not pos then return {'invalid'} end
+local eventKey = tostring(idx)
+if not session.events[eventKey] then
+  if pos ~= session.reviewed + 1 then return {'order'} end
+  session.events[eventKey] = {at=tonumber(ARGV[2]), rating=ARGV[3]}
+  session.reviewed = session.reviewed + 1
+end
+if session.reviewed < #session.indices then
+  redis.call('SET', KEYS[1], cjson.encode(session), 'EX', ARGV[4])
+  return {'progress', tostring(session.reviewed)}
+end
+local code = redis.call('GET', KEYS[2])
+if not code then
+  if redis.call('EXISTS', KEYS[3]) == 1 then return {'collision'} end
+  code = ARGV[5]
+  local record = {code=code, jobHash=ARGV[6], setNumber=session.setNumber,
+    generatedCards=session.generatedCards, reviewedCards=session.reviewed,
+    generationRequestedAt=session.generationRequestedAt, generationCompletedAt=session.generationCompletedAt,
+    approvalReportedAt=session.startedAt, approvedCardsReported=#session.indices,
+    reviewStartedAt=session.startedAt, completedAt=tonumber(ARGV[2]), status='verified', emailStatus='unbound'}
+  redis.call('SET', KEYS[3], cjson.encode(record), 'EX', ARGV[4])
+  redis.call('SET', KEYS[2], code, 'EX', ARGV[4])
+end
+session.code = code
+redis.call('SET', KEYS[1], cjson.encode(session), 'EX', ARGV[4])
+return {'complete', code, tostring(session.reviewed)}`;
+
+app.post('/api/research/review/start', async (req, res) => {
+  res.set('Cache-Control', 'no-store');
+  const { jobId, setNumber, sessionId, indices } = req.body || {};
+  if (!BG_CONFIGURED) return res.status(503).json({error:'Verification storage unavailable.'});
+  if (!bgSafeJobID(jobId) || !tcProofID(sessionId) || !Number.isInteger(setNumber) ||
+      !Array.isArray(indices) || indices.length < TC_PROOF_MIN || indices.length > 30 ||
+      indices.some(i => !Number.isInteger(i) || i < 0) || new Set(indices).size !== indices.length)
+    return res.status(400).json({error:'Review at least 10 approved cards from one generated set.'});
+  try {
+    const key = tcProofSessionKey(sessionId);
+    const existing = await bgRedis('GET', key);
+    if (existing) {
+      const old = JSON.parse(existing);
+      if (old.jobId !== jobId || old.setNumber !== setNumber || JSON.stringify(old.indices) !== JSON.stringify(indices))
+        return res.status(409).json({error:'Review session does not match.'});
+      return res.json({ok:true});
+    }
+    const job = await bgGet(jobId);
+    const set = job?.sets?.find(s => s.setNumber === setNumber && s.status === 'completed');
+    if (!set || !Array.isArray(set.cards) || set.cards.length !== job.cardsPerSet ||
+        indices.some(i => i >= set.cards.length))
+      return res.status(404).json({error:'Completed generated set not found. Generate a new set to verify participation.'});
+    const proof = {jobId, setNumber, indices, generatedCards:set.cards.length,
+      generationRequestedAt:job.createdAt, generationCompletedAt:set.completedAt || null, startedAt:Date.now(), reviewed:0, events:{}};
+    const stored = await bgRedis('SET', key, JSON.stringify(proof), 'EX', TC_PROOF_TTL, 'NX');
+    if (stored !== 'OK') {
+      const raw = await bgRedis('GET',key);
+      const old = raw ? JSON.parse(raw) : null;
+      if (!old || old.jobId !== jobId || old.setNumber !== setNumber || JSON.stringify(old.indices) !== JSON.stringify(indices))
+        return res.status(409).json({error:'Review session does not match.'});
+    }
+    return res.json({ok:true});
+  } catch (e) { return res.status(503).json({error:'Verification temporarily unavailable. Try again.'}); }
+});
+
+app.post('/api/research/review/event', async (req, res) => {
+  res.set('Cache-Control', 'no-store');
+  const { sessionId, jobId, index, answer, rating } = req.body || {};
+  if (!BG_CONFIGURED) return res.status(503).json({error:'Verification storage unavailable.'});
+  if (!tcProofID(sessionId) || !bgSafeJobID(jobId) || !Number.isInteger(index) || index < 0 || index > 29 ||
+      typeof answer !== 'string' || !answer.trim() || answer.length > 20000 ||
+      !['Difficult','Partially Remembered','Remembered'].includes(rating))
+    return res.status(400).json({error:'Invalid review activity.'});
+  try {
+    const key = tcProofSessionKey(sessionId);
+    const raw = await bgRedis('GET', key);
+    const proof = raw ? JSON.parse(raw) : null;
+    if (!proof || proof.jobId !== jobId) return res.status(404).json({error:'Review verification session not found.'});
+    // Only server timestamps, card indices and recall ratings are stored; answer text is not retained here.
+    const hash = crypto.createHash('sha256').update(jobId).digest('hex');
+    for (let attempt = 0; attempt < 3; attempt++) {
+      const code = 'TC-' + crypto.randomBytes(10).toString('hex').toUpperCase().match(/.{5}/g).join('-');
+      const result = await bgRedis('EVAL', TC_PROOF_EVENT_SCRIPT, 3, key, tcProofJobKey(hash), tcProofCodeKey(code),
+        index, Date.now(), rating, TC_PROOF_TTL, code, hash);
+      if (result?.[0] === 'collision') continue;
+      if (result?.[0] === 'progress') return res.json({ok:true,reviewed:Number(result[1])});
+      if (result?.[0] === 'complete') return res.json({ok:true,code:result[1],reviewed:Number(result[2])});
+      return res.status(409).json({error:'Review activity is missing or out of order.'});
+    }
+    return res.status(503).json({error:'Could not allocate a completion code. Retry verification.'});
+  } catch (e) { return res.status(503).json({error:'Verification temporarily unavailable. Try again.'}); }
+});
+
+// Bind the completed job's token to a self-reported survey email, once.
+// The email is not authenticated; researchers compare it with the survey response.
+const TC_PROOF_BIND_SCRIPT = `
+local raw = redis.call('GET', KEYS[1])
+if not raw then return {'missing'} end
+local session = cjson.decode(raw)
+if session.jobId ~= ARGV[1] or not session.code or session.reviewed < #session.indices then return {'incomplete'} end
+if session.code ~= ARGV[2] then return {'incomplete'} end
+local rawRecord = redis.call('GET', KEYS[2])
+if not rawRecord then return {'missing'} end
+local record = cjson.decode(rawRecord)
+if record.status ~= 'verified' or record.jobHash ~= ARGV[3] then return {'incomplete'} end
+if record.studentEmail and record.studentEmail ~= ARGV[4] then return {'bound'} end
+if not record.studentEmail then
+  record.studentEmail = ARGV[4]
+  record.emailStatus = 'self-reported'
+  record.emailBoundAt = tonumber(ARGV[5])
+  redis.call('SET', KEYS[2], cjson.encode(record), 'KEEPTTL')
+end
+return {'ok', session.code}`;
+app.post('/api/research/review/claim', async (req,res) => {
+  res.set('Cache-Control','no-store');
+  const {sessionId,jobId,email} = req.body || {};
+  const normalized = typeof email === 'string' ? email.trim().toLowerCase() : '';
+  if (!BG_CONFIGURED) return res.status(503).json({error:'Verification storage unavailable.'});
+  if (!tcProofID(sessionId) || !bgSafeJobID(jobId) || normalized.length > 254 || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(normalized))
+    return res.status(400).json({error:'Enter a valid student email address.'});
+  try {
+    const key=tcProofSessionKey(sessionId), raw=await bgRedis('GET',key);
+    const proof=raw?JSON.parse(raw):null;
+    if (!proof || proof.jobId!==jobId || !/^TC-(?:[A-F0-9]{5}-){3}[A-F0-9]{5}$/.test(proof.code||''))
+      return res.status(409).json({error:'Complete your review before claiming a code.'});
+    const hash=crypto.createHash('sha256').update(jobId).digest('hex');
+    const result=await bgRedis('EVAL',TC_PROOF_BIND_SCRIPT,2,key,tcProofCodeKey(proof.code),jobId,proof.code,hash,normalized,Date.now());
+    if(result?.[0]==='ok')return res.json({ok:true,code:result[1]});
+    if(result?.[0]==='bound')return res.status(409).json({error:'This code is already linked to another email. Contact the researchers if you entered the wrong address.'});
+    return res.status(409).json({error:'Verification is incomplete or expired. Generate and review a new set.'});
+  }catch{return res.status(503).json({error:'Verification temporarily unavailable. Please retry.'});}
 });
 
 app.get(['/', '/index.html'], (req, res) => {
