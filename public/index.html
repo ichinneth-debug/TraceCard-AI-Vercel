@@ -2464,7 +2464,8 @@ body[data-theme="dark"] .tc-calendar-footer{border-top-color:#40516e}
 @media(max-width:560px){.tc-calendar-dialog{padding:18px;border-radius:17px}.tc-calendar-header h2{font-size:20px}.tc-calendar-date-row{align-items:stretch;flex-direction:column}.tc-calendar-add-date{width:100%;white-space:normal}}
 </style>
 <style id="tc-cancel-bell-schedule-fix">
-/* Cancel Generation: always visible, enabled only while generating. */
+/* Cancel Generation: appears only while a generation is active. */
+.generate-actions .tc-cancel-generation[hidden]{display:none!important}
 .generate-actions .tc-cancel-generation{
  display:inline-flex;align-items:center;justify-content:center;min-height:44px;
  border:1px solid #ef929a;background:#fff4f4;color:#bf3544;
@@ -2795,6 +2796,64 @@ body[data-theme="dark"] #bellMessage .tc-bell-keep-scheduled{color:#b4dfff;borde
 #bellPopover #bellReview:not(:disabled){cursor:pointer;touch-action:manipulation;}
 @media(max-width:700px){#bellMessage.tc-bell-dates{max-height:min(58dvh,450px);}}
 </style>
+
+<style id="tc-generation-completion-notification-v1">
+/* Keep background generation quiet until the results are ready. Error boxes remain available. */
+#tcGeneratedCompleteToast[hidden],#tcGeneratedReadyBell[hidden]{display:none!important}
+#tcGeneratedCompleteToast{position:fixed;z-index:300;right:clamp(12px,3vw,32px);bottom:clamp(16px,4vh,36px);width:min(440px,calc(100vw - 24px));display:flex;align-items:center;gap:12px;padding:15px 13px;background:#f1fff6;color:#143c2b;border:1px solid #a2dbc1;box-shadow:0 15px 40px #112f2340;border-radius:16px;font-size:13px}
+#tcGeneratedCompleteToast .tc-gen-ready-mark{display:grid;place-items:center;flex:0 0 35px;width:35px;height:35px;background:#1e9d6a;color:#fff;border-radius:50%;font-size:21px;font-weight:800}
+#tcGeneratedCompleteToast .tc-gen-ready-message{display:flex;flex:1 1 auto;min-width:0;flex-direction:column;gap:2px}
+#tcGeneratedCompleteToast .tc-gen-ready-message strong{font-size:15px;font-weight:800}
+#tcGeneratedCompleteToast button{font:inherit;cursor:pointer;flex-shrink:0}
+#tcGeneratedToastView{background:#0a8c63;color:#fff;border:0;border-radius:9px;padding:9px 12px;font-weight:750}
+#tcGeneratedToastDismiss{background:transparent;border:0;color:inherit;font-size:24px;line-height:1;padding:4px}
+#tcGeneratedReadyBell{display:flex;flex-direction:column;gap:4px;text-align:left;width:100%;border:1px solid #85d7b0;background:#ebfff4;color:#186949;border-radius:13px;padding:11px 14px;margin:4px 0 12px;cursor:pointer;font:inherit}
+#tcGeneratedReadyBell strong{font-size:14px;font-weight:800}
+#tcGeneratedReadyBell span,#tcGeneratedReadyBell small{font-size:12px;color:#286b50}
+#tcGeneratedReadyBell:hover{background:#d9fae8}
+body[data-theme="dark"] #tcGeneratedCompleteToast{background:#17372d;color:#f2fff8;border-color:#317d5f}
+body[data-theme="dark"] #tcGeneratedReadyBell{background:#17372d;color:#b3f5d3;border-color:#317d5f}
+body[data-theme="dark"] #tcGeneratedReadyBell span,body[data-theme="dark"] #tcGeneratedReadyBell small{color:#b5dfc9}
+body[data-theme="dark"] #tcGeneratedReadyBell:hover{background:#22503d}
+@media(max-width:420px){#tcGeneratedCompleteToast{gap:9px;padding:12px 10px;font-size:12px}#tcGeneratedToastView{padding:8px 9px}}
+</style>
+<style id="tc-hero-no-arrows-final">
+/* Keep the three animated hero cards, remove all connectors and connector spacing. */
+#home .tc-landing .tc-steps::before,
+#home .tc-landing .tc-step::after { content:none !important; display:none !important; }
+#home .tc-landing .tc-steps { --tc-flow-gap:0px !important; gap:clamp(14px,2.7vw,32px) !important; }
+@media (max-width:850px) {
+ #home .tc-landing .tc-steps {gap:16px !important;}
+}
+</style>
+
+<style id="tc-clear-confirm-design">
+/* Styled, accessible replacement for native browser confirms when clearing data. */
+.tc-clear-overlay[hidden]{display:none!important}
+.tc-clear-overlay{position:fixed;inset:0;z-index:2400;background:rgba(9,18,43,.65);display:grid;place-items:center;padding:18px;overscroll-behavior:contain}
+.tc-clear-dialog{box-sizing:border-box;width:min(100%,480px);max-height:calc(100dvh - 36px);overflow:auto;background:#fff;color:#102246;border:1px solid #e3eaf3;border-radius:22px;padding:clamp(20px,4vw,28px);box-shadow:0 24px 75px rgba(7,28,64,.26);}
+.tc-clear-icon{width:52px;height:52px;border-radius:16px;background:#ffe8ec;color:#c6384d;display:flex;align-items:center;justify-content:center;margin-bottom:17px;}
+.tc-clear-icon svg{width:27px;height:27px;stroke:currentColor;fill:none;stroke-width:1.9;stroke-linecap:round;stroke-linejoin:round}
+.tc-clear-dialog h2{font-size:clamp(19px,3vw,23px);line-height:1.35;color:inherit;margin:0 0 9px;font-weight:800}
+.tc-clear-message{font-size:14px;line-height:1.7;color:#51647c;margin:0 0 12px}
+.tc-clear-kept{background:#f1f8ff;border:1px solid #d8eaf9;color:#315572;border-radius:13px;font-size:13px;line-height:1.6;padding:12px 14px;margin:0 0 20px}
+.tc-clear-kept strong{color:#0e6499}
+.tc-clear-actions{display:flex;align-items:center;justify-content:flex-end;gap:11px;flex-wrap:wrap}
+.tc-clear-actions button{font-family:inherit;font-size:14px;font-weight:750;padding:12px 19px;min-height:46px;border-radius:12px;cursor:pointer;transition:filter .15s,transform .15s;}
+.tc-clear-actions button:hover{filter:brightness(.96)}
+.tc-clear-actions button:active{transform:scale(.98)}
+.tc-clear-cancel{background:#fff;color:#263f60;border:1px solid #ccd7e6}
+.tc-clear-proceed{background:#ce4052;color:#fff;border:1px solid #ce4052;box-shadow:0 6px 14px rgba(206,64,82,.15)}
+.tc-clear-actions button:focus-visible{outline:3px solid #43a9e6;outline-offset:3px}
+body[data-theme="dark"] .tc-clear-dialog{background:#1a2841;color:#f2f7ff;border-color:#3a4d68}
+body[data-theme="dark"] .tc-clear-icon{background:#493040;color:#ffafba}
+body[data-theme="dark"] .tc-clear-message{color:#c5d0e6}
+body[data-theme="dark"] .tc-clear-kept{background:#203950;border-color:#375775;color:#d4e9f7}
+body[data-theme="dark"] .tc-clear-kept strong{color:#89d4ff}
+body[data-theme="dark"] .tc-clear-cancel{background:#283a57;color:#f0f5ff;border-color:#4e6383}
+body[data-theme="dark"] .tc-clear-proceed{background:#c33f54;border-color:#c33f54;color:#fff}
+@media(max-width:400px){.tc-clear-actions{flex-direction:column-reverse}.tc-clear-actions button{width:100%}}
+</style>
 </head>
 <body data-theme="light">
 
@@ -2812,7 +2871,7 @@ body[data-theme="dark"] #bellMessage .tc-bell-keep-scheduled{color:#b4dfff;borde
  <div class="search-wrap"><svg class="icon" aria-hidden="true"><use href="#i-search"></use></svg><input type="search" id="siteSearch" placeholder="Search your flashcards, sets, or history..." autocomplete="off" aria-label="Search flashcards"><kbd class="shortcut">Ctrl /</kbd><div class="search-results" id="searchResults"></div></div>
  <div class="top-actions">
   <button type="button" id="headerThemeToggle" class="tc-header-theme" aria-label="Switch to dark mode" title="Switch to Dark Mode"><svg class="icon tc-theme-icon tc-theme-moon" aria-hidden="true"><use href="#i-moon"></use></svg><svg class="icon tc-theme-icon tc-theme-sun" aria-hidden="true"><use href="#i-sun"></use></svg><span class="tc-theme-label">Dark Mode</span></button>
-  <div class="top-popovers"><button class="icon-button" id="bellButton" aria-label="Review notifications"><svg class="icon" aria-hidden="true"><use href="#i-bell"></use></svg><span class="notification-dot" id="noticeDot"></span></button><div class="floating-popover" id="bellPopover"><h4>Review reminders</h4><div id="bellMessage" class="tc-bell-dates" aria-live="polite">No reviews due right now.</div><button class="btn-primary" id="bellReview">Open Review</button></div></div>
+  <div class="top-popovers"><button class="icon-button" id="bellButton" aria-label="Review notifications"><svg class="icon" aria-hidden="true"><use href="#i-bell"></use></svg><span class="notification-dot" id="noticeDot"></span></button><div class="floating-popover" id="bellPopover"><h4>Notifications &amp; review reminders</h4><button type="button" id="tcGeneratedReadyBell" hidden aria-label="View newly generated flashcards"><strong>✓ Flashcards ready</strong><span id="tcGeneratedReadyBellText"></span><small>Open Flashcard Sets</small></button><div id="bellMessage" class="tc-bell-dates" aria-live="polite">No reviews due right now.</div><button class="btn-primary" id="bellReview">Open Review</button></div></div>
   <span class="tc-header-separator" aria-hidden="true"></span>
   <button type="button" class="tc-header-icon" data-page="settings" aria-label="Settings" title="Settings"><svg class="icon" aria-hidden="true"><use href="#i-settings"></use></svg></button>
   <button type="button" class="tc-header-icon" data-page="help" aria-label="Help" title="Help"><svg class="icon" aria-hidden="true"><use href="#i-help"></use></svg></button>
@@ -2865,7 +2924,7 @@ body[data-theme="dark"] #bellMessage .tc-bell-keep-scheduled{color:#b4dfff;borde
      <span class="tc-gen-label" id="cardAmount-label">Cards per set</span>
      <select id="cardAmount" aria-labelledby="cardAmount-label"><option>10</option><option selected>20</option><option>30</option></select>
     </div>
-   </div><div class="generate-actions"><button id="make" class="btn-primary" disabled>Generate Flashcards</button><button id="cancelGeneration" class="btn-secondary tc-cancel-generation" type="button" disabled aria-label="Cancel current flashcard generation">Cancel Generation</button><button id="clear" class="btn-secondary">Clear Generated Data</button></div><p id="info" role="status">No PDF selected.</p><div id="tcGenProgress" class="tc-gen-progress" hidden aria-live="polite">
+   </div><div class="generate-actions"><button id="make" class="btn-primary" disabled>Generate Flashcards</button><button id="cancelGeneration" class="btn-secondary tc-cancel-generation" type="button" hidden disabled aria-label="Cancel current flashcard generation">Cancel Generation</button><button id="clear" class="btn-secondary">Clear Generated Data</button></div><p id="info" role="status">No PDF selected.</p><div id="tcGenProgress" class="tc-gen-progress" hidden aria-live="polite">
  <div class="tc-gen-progress-header"><strong id="tcGenProgressTitle">Flashcard generation</strong><span id="tcGenProgressCount">0 / 20 saved</span></div>
  <div id="tcGenProgressTrack" class="tc-gen-progress-track" role="progressbar" aria-label="Successfully saved flashcards" aria-valuemin="0" aria-valuemax="20" aria-valuenow="0"><div id="tcGenProgressFill" class="tc-gen-progress-fill"></div></div>
   <p id="tcGenProgressNote" class="tc-gen-progress-note">Progress is saved after each valid flashcard.</p>
@@ -2956,6 +3015,29 @@ body[data-theme="dark"] #bellMessage .tc-bell-keep-scheduled{color:#b4dfff;borde
 
 <div id="reader" hidden><div id="viewer" role="dialog" aria-modal="true" aria-labelledby="sourceTitle"><div class="tc-source-toolbar"><button type="button" class="tc-source-close" onclick="closeSource()">Close</button><div class="tc-source-title-wrap"><b id="sourceTitle"></b><span id="tcSourcePage"></span></div></div><p id="sourceNote"></p><div id="paper"><canvas id="pdfCanvas"></canvas><div id="marks"></div></div></div></div>
 
+<div id="tcGeneratedCompleteToast" role="status" aria-live="polite" hidden>
+ <span class="tc-gen-ready-mark" aria-hidden="true">✓</span>
+ <span class="tc-gen-ready-message"><strong>Flashcards ready!</strong><span id="tcGeneratedCompleteToastText">Your flashcards are ready to review and approve.</span></span>
+ <button type="button" id="tcGeneratedToastView">View Sets</button>
+ <button type="button" id="tcGeneratedToastDismiss" aria-label="Dismiss notification" title="Dismiss">×</button>
+</div>
+
+
+<div id="tcClearConfirm" class="tc-clear-overlay" hidden>
+  <div class="tc-clear-dialog" role="alertdialog" aria-modal="true" aria-labelledby="tcClearTitle" aria-describedby="tcClearMessage tcClearKept" tabindex="-1">
+    <div class="tc-clear-icon" aria-hidden="true">
+      <svg viewBox="0 0 24 24"><path d="M3 6h18M8 6V4h8v2m3 0-1 14H6L5 6m5 4v6m4-6v6"/></svg>
+    </div>
+    <h2 id="tcClearTitle">Confirm action</h2>
+    <p id="tcClearMessage" class="tc-clear-message"></p>
+    <p id="tcClearKept" class="tc-clear-kept"></p>
+    <div class="tc-clear-actions">
+      <button type="button" class="tc-clear-cancel" id="tcClearCancel">Keep My Data</button>
+      <button type="button" class="tc-clear-proceed" id="tcClearProceed">Yes, Clear Data</button>
+    </div>
+  </div>
+</div>
+
 <script>
 const tcStore=(()=>{
  try{
@@ -2971,6 +3053,51 @@ const tcStore=(()=>{
 const $=id=>document.getElementById(id);
 const key='tracecard_simple_';
 const themeKey=key+'theme';
+// Returns true only after a user explicitly clicks the destructive confirmation button.
+let tcClearPending=null;
+function tcConfirmClear({title,description,kept,confirmLabel}){
+ if(tcClearPending)return Promise.resolve(false);
+ return new Promise(resolve=>{
+  const root=$('tcClearConfirm');
+  const previousFocus=document.activeElement;
+  $('tcClearTitle').textContent=title;
+  $('tcClearMessage').textContent=description;
+  $('tcClearKept').textContent=kept;
+  $('tcClearProceed').textContent=confirmLabel||'Yes, Clear Data';
+  const dialog=root.querySelector('.tc-clear-dialog');
+  const onCancel=()=>finish(false);
+  const onConfirm=()=>finish(true);
+  const onBackdrop=(event)=>{if(event.target===root)finish(false)};
+  const onKeys=(event)=>{
+   if(event.key==='Escape'){event.preventDefault();event.stopPropagation();finish(false);return;}
+   if(event.key==='Tab'){
+    const focusables=[$('tcClearCancel'),$('tcClearProceed')];
+    const first=focusables[0],last=focusables[focusables.length-1];
+    if(event.shiftKey&&document.activeElement===first){event.preventDefault();last.focus();}
+    else if(!event.shiftKey&&document.activeElement===last){event.preventDefault();first.focus();}
+   }
+  };
+  function finish(confirmed){
+   if(!tcClearPending)return;
+   $('tcClearCancel').removeEventListener('click',onCancel);
+   $('tcClearProceed').removeEventListener('click',onConfirm);
+   root.removeEventListener('click',onBackdrop);
+   document.removeEventListener('keydown',onKeys,true);
+   root.hidden=true;
+   tcClearPending=null;
+   if(previousFocus&&previousFocus.isConnected)previousFocus.focus({preventScroll:true});
+   resolve(confirmed);
+  }
+  tcClearPending={finish};
+  $('tcClearCancel').addEventListener('click',onCancel);
+  $('tcClearProceed').addEventListener('click',onConfirm);
+  root.addEventListener('click',onBackdrop);
+  document.addEventListener('keydown',onKeys,true);
+  root.hidden=false;
+  $('tcClearCancel').focus({preventScroll:true});
+ });
+}
+
 
 function applyTheme(choice){
  const theme=choice==='dark'?'dark':'light';
@@ -3384,6 +3511,57 @@ function drawReminders(){
 
 // PDF UPLOAD AND EXTRACTION
 
+// Keep ORIGINAL uploaded PDFs on this browser for page-level source traceability.
+// IndexedDB stores the File/Blob, avoiding localStorage size limits and avoiding any PDF uploads to the AI backend.
+const tcPdfDBName='tracecard_original_pdfs_v1';
+const tcPdfDBStore='documents';
+const tcSourceDocCache=new Map();
+function tcOpenPdfDB(){
+ return new Promise((resolve,reject)=>{
+  if(!('indexedDB' in window))return reject(Error('IndexedDB unavailable'));
+  const request=indexedDB.open(tcPdfDBName,1);
+  request.onupgradeneeded=()=>{
+   const db=request.result;
+   if(!db.objectStoreNames.contains(tcPdfDBStore)) db.createObjectStore(tcPdfDBStore,{keyPath:'name'});
+  };
+  request.onsuccess=()=>resolve(request.result);
+  request.onerror=()=>reject(request.error||Error('PDF storage unavailable'));
+ });
+}
+async function tcSaveOriginalPdf(file){
+ const db=await tcOpenPdfDB();
+ try{
+  await new Promise((resolve,reject)=>{
+   const tr=db.transaction(tcPdfDBStore,'readwrite');
+   tr.objectStore(tcPdfDBStore).put({name:file.name,blob:file,updatedAt:Date.now()});
+   tr.oncomplete=resolve;
+   tr.onerror=()=>reject(tr.error||Error('Could not save PDF'));
+   tr.onabort=()=>reject(tr.error||Error('Could not save PDF'));
+  });
+ }finally{db.close();}
+}
+async function tcGetOriginalPdf(name){
+ const db=await tcOpenPdfDB();
+ try{
+  return await new Promise((resolve,reject)=>{
+   const tr=db.transaction(tcPdfDBStore,'readonly');
+   const request=tr.objectStore(tcPdfDBStore).get(name);
+   request.onsuccess=()=>resolve(request.result?.blob||null);
+   request.onerror=()=>reject(request.error||Error('Cannot read saved PDF'));
+  });
+ }finally{db.close();}
+}
+async function tcGetSourceDocument(name){
+ if(doc && fileName===name)return doc;
+ if(tcSourceDocCache.has(name))return tcSourceDocCache.get(name);
+ const file=await tcGetOriginalPdf(name);
+ if(!file)throw Error('Original PDF is not saved on this browser. Please re-upload it to restore View Source.');
+ const sourceDoc=await pdfjsLib.getDocument({data:new Uint8Array(await file.arrayBuffer()),disableWorker:true}).promise;
+ tcSourceDocCache.set(name,sourceDoc);
+ return sourceDoc;
+}
+
+
 $('pdf').onchange=async e=>{
  const file=e.target.files[0];
  if(!file)return;
@@ -3433,8 +3611,18 @@ $('pdf').onchange=async e=>{
    throw Error('No readable text found. Try another PDF.');
 
   fileName=file.name;
+  let savedOriginalPdf=true;
+  try{
+   await tcSaveOriginalPdf(file);
+   $('sourceNote').textContent='Original PDF saved locally for source traceability.';
+  }catch(storageError){
+   savedOriginalPdf=false;
+   console.warn('[TraceCard AI] PDF could not be saved on this device:',storageError);
+   // Source is still available for this browser session. Re-upload after reload if needed.
+   $('info').textContent='PDF loaded, but persistent source storage is unavailable in this browser.';
+  }
   $('make').disabled=false;
-  $('info').textContent=fileName+' - '+pages.length+' pages ready.';
+  $('info').textContent=fileName+' - '+pages.length+' pages ready.'+(savedOriginalPdf?'':' PDF source could not be saved on this device; re-upload it after a browser restart to view source pages.');
   tcSavedDraftSummary();
 
  }catch(err){
@@ -3511,7 +3699,13 @@ function matchesFlashcardItemSchema(item,schema){
  return true;
 }
 const draftKey=key+'generation_drafts_v2';
-const pause=ms=>new Promise(resolve=>setTimeout(resolve,ms));
+let tcGenerationPauseResolver=null;
+const pause=ms=>new Promise(resolve=>{
+ const finish=()=>{if(tcGenerationPauseResolver===wake)tcGenerationPauseResolver=null;resolve();};
+ const timer=setTimeout(finish,ms);
+ const wake=()=>{clearTimeout(timer);finish();};
+ tcGenerationPauseResolver=wake;
+});
 function loadDrafts(){
  try{return JSON.parse(tcStore.getItem(draftKey)||'{}')||{}}
  catch{return {}}
@@ -3532,11 +3726,13 @@ let tcBgCancelling=false;
 let tcBgStarting=false;
 function tcUpdateCancelButton(){
  const linked=tcBgGet();
- const activeBackground=Boolean(linked&&!['failed','cancelled'].includes(linked.lastStatus||''));
+ const activeBackground=Boolean(linked&&!['failed','cancelled','completed','succeeded','done'].includes(String(linked.lastStatus||'').toLowerCase()));
  const button=$('cancelGeneration');if(!button)return;
- button.disabled=tcBgCancelling||tcBgStarting||!(tcLegacyGenerating||activeBackground);
+ const activelyGenerating=tcLegacyGenerating||activeBackground||tcBgStarting||tcBgCancelling||tcGenerationCancelRequested;
+ button.hidden=!activelyGenerating;
+ button.disabled=tcBgCancelling||tcBgStarting||tcGenerationCancelRequested||!(tcLegacyGenerating||activeBackground);
  $('clear').disabled=tcBgCancelling||tcBgStarting||tcLegacyGenerating||activeBackground;
- button.textContent=tcBgCancelling?'Cancelling...':tcGenerationCancelRequested?'Cancelling...':'Cancel Generation';
+ button.textContent=tcBgCancelling||tcGenerationCancelRequested?'Cancelling...':'Cancel Generation';
 }
 
 let tcToastTimer=null;
@@ -3619,6 +3815,50 @@ function commitDeck(list,setNumber,batchDate){
 // remains the fallback (and cannot promise background completion).
 const tcBgKey=key+'background_generation_job_v1';
 const tcBgBase='/api/generation-jobs';
+const tcBgReadyKey=key+'generation_completed_notice_v1';
+let tcBgReadyToastTimer=null;
+function tcBgReadyNotice(){
+ try{const data=JSON.parse(tcStore.getItem(tcBgReadyKey)||'null');return data&&typeof data.id==='string'?data:null;}
+ catch{return null;}
+}
+function tcBgRefreshReadyBell(){
+ const notice=tcBgReadyNotice(),button=$('tcGeneratedReadyBell');
+ if(button){
+  button.hidden=!notice;
+  if(notice)$('tcGeneratedReadyBellText').textContent=`${notice.total} card${notice.total===1?'':'s'} generated. Ready for validation.`;
+ }
+ const dot=$('noticeDot');if(dot)dot.style.display=(notice||due().length)?'block':'none';
+}
+function tcBgOpenCompletedSets(){
+ try{tcStore.removeItem(tcBgReadyKey);}catch(err){console.warn('Could not clear completion notice:',err);}
+ $('tcGeneratedCompleteToast').hidden=true;
+ $('bellPopover').classList.remove('show');
+ tcBgRefreshReadyBell();
+ show('sets');window.scrollTo({top:0,behavior:'auto'});
+}
+$('tcGeneratedReadyBell').addEventListener('click',tcBgOpenCompletedSets);
+$('tcGeneratedToastView').addEventListener('click',tcBgOpenCompletedSets);
+$('tcGeneratedToastDismiss').addEventListener('click',()=>{$('tcGeneratedCompleteToast').hidden=true;});
+function tcBgNotifyCompleted(job,total){
+ const notice={id:String(job.id),total:Number(total)||0,pdfName:String(job.pdfName||'PDF'),timestamp:Date.now()};
+ try{tcStore.setItem(tcBgReadyKey,JSON.stringify(notice));}catch(err){console.warn('Could not save generation notice:',err);}
+ tcBgRefreshReadyBell();
+ $('tcGeneratedCompleteToastText').textContent=`${notice.total} card${notice.total===1?'':'s'} saved. Ready for validation.`;
+ $('tcGeneratedCompleteToast').hidden=false;
+ clearTimeout(tcBgReadyToastTimer);
+ tcBgReadyToastTimer=setTimeout(()=>{$('tcGeneratedCompleteToast').hidden=true;},11000);
+ // Browser notification requires the student to enable notifications in Settings.
+ // If the tab was closed, the server job is checked on next visit and this is delivered then.
+ if('Notification' in window&&window.isSecureContext&&Notification.permission==='granted'){
+  try{
+   const notification=new Notification('TraceCard AI • Flashcards Ready',{
+    body:`${notice.total} flashcards generated successfully. Open Flashcard Sets to approve them.`,
+    tag:'tracecard-generation-'+notice.id
+   });
+   notification.onclick=()=>{window.focus();tcBgOpenCompletedSets();notification.close();};
+  }catch(err){console.warn('System notification not supported by this browser:',err);}
+ }
+}
 let tcBgPollTimer=null,tcBgChecking=false;
 function tcBgGet(){
  try{const job=JSON.parse(tcStore.getItem(tcBgKey)||'null');return job&&typeof job.id==='string'&&job.id.length>=12?job:null;}
@@ -3630,7 +3870,12 @@ function tcBgRemember(job){
 }
 function tcBgAlert(title,message,showRefresh=true){
  const node=$('tcBgStatus');if(!node)return;
- node.hidden=false;$('tcBgStatusHeading').textContent=title;
+ // Keep normal queue / generation progress out of the large background status box.
+ // Display a compact actionable error only if server status actually needs attention.
+ const isProblem=/^(?:could not|generation stopped|generation finished, but|background job was not confirmed)/i.test(String(title));
+ node.hidden=!isProblem;
+ if(!isProblem)return;
+ $('tcBgStatusHeading').textContent=title;
  $('tcBgStatusText').textContent=message;
  $('tcBgRefresh').hidden=!showRefresh;
 }
@@ -3715,6 +3960,7 @@ async function tcBgCheckStatus(){
     // return from another app), open the pending flashcards for validation.
     show('sets');
     window.scrollTo({top:0,behavior:'auto'});
+    tcBgNotifyCompleted(job,total);
     return;
    }
    tcProgressDisplay(saved,total,'saved',`${importedSets}/${job.sets} completed sets imported.`);
@@ -3746,7 +3992,7 @@ async function tcBgIsAvailable(){
    const r=await fetch(`${tcBgBase}/capabilities`,{signal:controller.signal,cache:'no-store'});
    if(!r.ok)return false;
    const data=await r.json();
-   return data?.enabled===true&&data?.persistent===true&&Number(data.version)===1;
+   return data?.enabled===true&&data?.persistent===true&&Number(data.version)===1&&Number(data.cancelProtocol)===2;
   }finally{clearTimeout(timer);}
  }catch{return false;}
 }
@@ -3911,11 +4157,13 @@ ${source}`;
     tcGenerationRequestController=null;
     if(!tcGenerationCancelRequested&&found.length<target && failures<5)await pause(1200);
    }
-   if(found.length===target){
+   if(!tcGenerationCancelRequested&&found.length===target){
     commitDeck(found,set+1,generationDate);
     clearDraft(signature,set);
     completed++;
     tcProgressDisplay(completed*target+savedCount,amount*target,'working',`Set ${set+1} completed and saved.`);
+   }else if(tcGenerationCancelRequested){
+    clearDraft(signature,set); // cancelled partial batch must NOT survive
    }else{
     saveDraft(signature,set,found,target);
     savedCount+=found.length;
@@ -3923,8 +4171,13 @@ ${source}`;
    }
   }
   if(tcGenerationCancelRequested){
-   $('info').textContent=`Generation cancelled. ${completed} completed set(s) and ${savedCount} unfinished card(s) kept on this device.`;
-   tcProgressDisplay(completed*target+savedCount,amount*target,'saved','Cancelled. Saved flashcards are kept; re-upload the same PDF/settings to resume unfinished work.');
+   // Remove ALL unfinished drafts for this PDF and this settings combination.
+   const d=loadDrafts();
+   for(const k of Object.keys(d))if(k.startsWith(signature+':'))delete d[k];
+   storeDrafts(d);
+   savedCount=0;
+   $('info').textContent=`Generation cancelled. ${completed} completed set(s) kept; all unfinished batches discarded.`;
+   tcProgressDisplay(completed*target,amount*target,'saved','Cancelled. Unfinished cards were discarded. Only completed sets remain.');
   }else if(savedCount){
    $('info').textContent=`${completed} completed set(s). ${savedCount} unfinished card(s) saved locally. Keep the same PDF and click Generate Flashcards again to resume toward ${target}.`;
   }else{
@@ -3934,11 +4187,12 @@ ${source}`;
   if(completed&&!tcGenerationCancelRequested){
    show('sets');
    window.scrollTo({top:0,behavior:'auto'});
+   if(completed===amount)tcBgNotifyCompleted({id:'local:'+generationDate,pdfName:fileName},completed*target);
   }
  }catch(err){
   tcProgressDisplay(completed*target+savedCount,amount*target,'saved','Generation was interrupted. Completed batches are retained locally.');
   $('info').textContent='Generation paused; saved progress is retained. '+err.message;
- }finally{tcGenerationRequestController=null;tcGenerationRunning=false;tcLegacyGenerating=false;tcGenerationCancelRequested=false;button.disabled=!doc;button.textContent='Generate Flashcards';if(completed<amount&&doc)button.textContent='Resume Generation';tcUpdateCancelButton();}
+ }finally{const cancelled=tcGenerationCancelRequested;tcGenerationRequestController=null;tcGenerationRunning=false;tcLegacyGenerating=false;tcGenerationCancelRequested=false;button.disabled=!doc;button.textContent='Generate Flashcards';if(completed<amount&&doc&&!cancelled)button.textContent='Resume Generation';tcUpdateCancelButton();}
 };
 
 
@@ -3947,7 +4201,7 @@ $('cancelGeneration').onclick=async()=>{
  const job=tcBgGet();
  const activeBg=job&&!['failed','cancelled'].includes(job.lastStatus||'');
  if(!activeBg&&!tcLegacyGenerating)return;
- if(!confirm('Cancel the current generation? Completed flashcard sets will be kept. Unfinished browser batches will be saved for later.'))return;
+ if(!confirm('Stop generation now? Completed sets will be kept, but ALL unfinished cards from this generation will be discarded.'))return;
  if(activeBg){
   tcBgCancelling=true;tcUpdateCancelButton();
   try{
@@ -3962,28 +4216,36 @@ $('cancelGeneration').onclick=async()=>{
    const imported=tcBgImportCompletedSets(data,job);
    const saved=Math.max(0,Number(data.savedCards)||0),total=job.sets*job.cardsPerSet;
    tcBgStopPolling();tcBgRemember(null);
-   tcProgressDisplay(saved,total,'saved','Generation cancelled. Any completed sets were kept.');
+   tcProgressDisplay(saved,total,'saved','Generation cancelled. Incomplete cards discarded; completed sets kept.');
    tcBgAlert('Generation cancelled',`${imported} completed set(s) recovered. You can start again any time.`,false);
-   $('info').textContent='Generation cancelled. Completed sets were kept; no further batches will be generated.';
+   $('info').textContent='Generation cancelled. All unfinished batches discarded; completed sets kept.';
    tcBgBusy(false);
   }catch(error){
-   tcBgAlert('Could not cancel generation',error.message+' Check status before trying again.',true);
+   tcBgAlert('Could not cancel generation',error.message+' Ensure the deployed server.js shares the same Upstash Redis as the generation worker. Cancellation has NOT been confirmed.',true);
    $('info').textContent='Cancellation was not confirmed by the server. The job may still be running.';
    tcBgStartPolling();
   }finally{tcBgCancelling=false;tcUpdateCancelButton();}
  }else{
   tcGenerationCancelRequested=true;
+  tcGenerationPauseResolver?.();
   tcGenerationRequestController?.abort();
-  $('info').textContent='Cancelling generation… saved flashcards will be kept.';
+  $('info').textContent='Cancelling generation… unfinished cards will be discarded.';
   tcUpdateCancelButton();
  }
 };
 
 // CLEAR GENERATED DATA ONLY
-$('clear').onclick=()=>{
+$('clear').onclick=async()=>{
  if(tcLegacyGenerating||tcBgStarting||tcBgCancelling){alert('Cancel the active generation first.');return;}
  if(tcBgGet()&&!['failed','cancelled'].includes(tcBgGet().lastStatus||'')){alert('Cancel the active background generation before clearing generated data.');return;}
- if(!confirm('Remove generated flashcards and unfinished generation progress? Review History, scores, and Recent Activity will be kept.'))return;
+ if(!await tcConfirmClear({
+  title:'Clear Generated Data?',
+  description:'This removes generated flashcards and unfinished generation progress from this device. You cannot undo this action.',
+  kept:'Your Review History, scores, and Recent Activity will be kept.',
+  confirmLabel:'Clear Generated Data'
+ }))return;
+ // Recheck activity, as it may have changed while the modal was open.
+ if(tcLegacyGenerating||tcBgStarting||tcBgCancelling||Boolean(tcBgGet()&&!['failed','cancelled'].includes(tcBgGet().lastStatus||'')))return;
  const byDeck=new Map(activityArchive.map(r=>[r.deck,r]));
  for(const deck of [...new Set(cards.map(c=>c.deck))]){
   const list=cards.filter(c=>c.deck===deck);
@@ -4352,10 +4614,15 @@ function rate(id,rating,days){
 
 // HISTORY
 
-function clearReviewHistory(){
+async function clearReviewHistory(){
  const hasHistory=logs.length>0||archivedCards.length>0||!!(session&&Object.keys(session.answers||{}).length);
  if(!hasHistory)return;
- if(!confirm('Clear all review answers, scores, and saved review history on this device? Generated flashcards, approved sets, review schedules, and Recent Activity will be kept. This cannot be undone.'))return;
+ if(!await tcConfirmClear({
+  title:'Clear Review History?',
+  description:'This permanently deletes your review answers, scores, and saved Review History on this device.',
+  kept:'Your generated flashcards, approved sets, review schedules, and Recent Activity will be kept.',
+  confirmLabel:'Clear Review History'
+ }))return;
  logs=[];
  archivedCards=[];
  session=null;
@@ -4574,8 +4841,9 @@ async function viewSource(id){
  const c=cards.find(x=>x.id===id);
  if(!c)return;
 
- if(!doc||fileName!==c.pdf)
-  return alert('Upload the original PDF again to view this source.');
+ let sourceDocument;
+ try{sourceDocument=await tcGetSourceDocument(c.pdf);}
+ catch(err){return alert(err.message);}
 
  $('reader').hidden=false;
  // Only change the displayed filename; keep the raw name for PDF matching.
@@ -4589,7 +4857,7 @@ async function viewSource(id){
  $('marks').replaceChildren();
 
  try{
-  const page=await doc.getPage(c.page);
+  const page=await sourceDocument.getPage(c.page);
   const view=page.getViewport({scale:1.4});
   const canvas=$('pdfCanvas');
 
@@ -4767,7 +5035,7 @@ function tcRenderBellSchedule(){
   {label:'Total Reviewed',value:logs.length,icon:'check-circle',style:'stat-green'}
  ];
  $('stats').innerHTML=data.map(d=>`<div class="stat-tile ${d.style}"><div class="stat-icon"><svg class="icon" aria-hidden="true"><use href="#i-${d.icon}"></use></svg></div><div><div class="stat-label">${d.label}</div><div class="stat-value">${d.value.toLocaleString()}</div></div></div>`).join('');
- $('noticeDot').style.display=due().length?'block':'none';
+ $('noticeDot').style.display=(due().length||tcBgReadyNotice())?'block':'none';
  tcRenderBellSchedule();
 }
 function renderRecentActivity(){
@@ -4851,6 +5119,7 @@ $('pdf').addEventListener('change',()=>{setTimeout(()=>{$('generationSettings').
 
 
 tcNoticeSavedProgressOnReload();
+tcBgRefreshReadyBell();
 tcBgRestoreAfterLoad();
 tcUpdateCancelButton();
 
@@ -4970,6 +5239,7 @@ document.querySelectorAll('.tc-header-icon[data-page]').forEach(button=>{
 
 </script>
 <div id="tcApprovalToast" class="tc-approval-toast" role="status" aria-live="polite" hidden><span class="tc-toast-check" aria-hidden="true">✓</span><span id="tcApprovalToastText">Flashcards approved</span></div>
+
 
 <script id="tc-getting-started-slideshow-script-v2">
 (function(){
