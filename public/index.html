@@ -5355,7 +5355,7 @@ async function tcHistoryDeleteSelected(){
  tcHistoryDeleting=true;
  try{
   const count=chosen.size;
-  if(!await tcConfirmClear({title:'Delete selected sets?',description:`Permanently delete ${count} selected set${count===1?'':'s'}, their flashcards, Recent Activity, review results and schedules. This cannot be undone.`,kept:'Other sets, appearance settings and research verification records will be kept.',confirmLabel:'Delete Selected',cancelLabel:'Cancel'}))return;
+  if(!await tcConfirmClear({title:'Delete selected sets?',description:'Selected sets and their related data will be permanently deleted. This cannot be undone.',kept:'',confirmLabel:'Delete Selected',cancelLabel:'Cancel'}))return;
   if(active()){alert('Finish or cancel generation before deleting selected sets.');return;}
   // Remember deleted server-backed sets so a failed-job status check cannot restore them.
   const tombstones=tcDeletedDecks();for(const d of chosen)if(String(d).startsWith('background:'))tombstones.add(d);
