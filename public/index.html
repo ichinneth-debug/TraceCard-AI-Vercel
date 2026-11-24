@@ -2791,7 +2791,7 @@ body[data-theme="dark"] #bellMessage .tc-bell-keep-scheduled{color:#b4dfff;borde
 #bellMessage.tc-bell-dates{max-height:min(420px,calc(100dvh - 230px));overscroll-behavior:contain;}
 #bellMessage .tc-bell-early-choice{flex-shrink:0;scroll-margin-block:12px;}
 #bellMessage .tc-bell-early-actions button{cursor:pointer;touch-action:manipulation;}
-#bellPopover #bellReview:not(:disabled){cursor:pointer;touch-action:manipulation;}
+
 @media(max-width:700px){#bellMessage.tc-bell-dates{max-height:min(58dvh,450px);}}
 </style>
 
@@ -2922,6 +2922,37 @@ body[data-theme="dark"] #bellMessage .tc-bell-rating-heading{color:#e8efff;}
 .tc-calendar-footer{margin-top:12px;padding-top:9px;}
 .tc-calendar-footer p{margin:0;}
 </style>
+<style id="tc-bell-pdf-title-layout">
+#bellMessage .tc-bell-pdf-detail{min-width:0;flex:1 1 auto;overflow-wrap:anywhere;}
+#bellMessage .tc-bell-pdf-detail strong{display:block;margin-bottom:3px;}
+#bellMessage .tc-bell-pdf-detail .tc-bell-review-date{display:block;margin-top:2px;}
+#bellMessage .tc-bell-count{flex:0 0 auto;}
+</style>
+<style id="tc-bell-pdf-accordion">
+#bellMessage .tc-bell-pdf-group{flex:0 0 auto;min-width:0;border:1px solid var(--tc-outline,#e2e8f0);border-radius:14px;background:var(--tc-card,#fff);overflow:hidden;color:var(--tc-heading,#192b50);}
+#bellMessage .tc-bell-pdf-group>summary{list-style:none;display:flex;align-items:center;gap:10px;cursor:pointer;min-height:58px;padding:12px;touch-action:manipulation;}
+#bellMessage .tc-bell-pdf-group>summary::-webkit-details-marker{display:none;}
+#bellMessage .tc-bell-pdf-group>summary::marker{content:'';}
+#bellMessage .tc-bell-pdf-group>summary:focus-visible{outline:2px solid #259de2;outline-offset:-3px;}
+#bellMessage .tc-bell-pdf-group>summary:hover{background:rgba(23,109,164,.05);}
+#bellMessage .tc-bell-pdf-icon{width:23px;height:23px;flex:0 0 23px;color:var(--tc-orange,#f3650b);}
+#bellMessage .tc-bell-pdf-summary{flex:1;min-width:0;overflow-wrap:anywhere;}
+#bellMessage .tc-bell-pdf-summary strong{display:block;font-size:13px;line-height:1.4;font-weight:750;}
+#bellMessage .tc-bell-pdf-summary small{display:block;font-size:11px;line-height:1.45;margin-top:3px;color:var(--tc-body,#63728a);}
+#bellMessage .tc-bell-chevron{width:9px;height:9px;flex:0 0 9px;border-right:2px solid currentColor;border-bottom:2px solid currentColor;transform:rotate(45deg);margin:0 4px 4px 2px;opacity:.65;}
+#bellMessage .tc-bell-pdf-group[open]>summary .tc-bell-chevron{transform:rotate(225deg);margin-bottom:-4px;}
+#bellMessage .tc-bell-pdf-rows{padding:0 10px 10px;display:flex;flex-direction:column;gap:6px;}
+#bellMessage .tc-bell-pdf-rows .tc-bell-row{min-height:54px;padding:9px 8px;gap:8px;border-radius:9px;box-shadow:none;}
+#bellMessage .tc-bell-rating-dot{width:8px;height:8px;flex:0 0 8px;border-radius:50%;background:#788399;}
+#bellMessage .tc-bell-rating-dot.difficult{background:#d04d4d;}
+#bellMessage .tc-bell-rating-dot.partial{background:#d58b16;}
+#bellMessage .tc-bell-rating-dot.remembered{background:#21966e;}
+#bellMessage .tc-bell-pdf-rows .tc-bell-pdf-detail strong{margin:0;font-size:12px;}
+#bellMessage .tc-bell-pdf-rows .tc-bell-review-date{margin-top:2px;font-size:11px;}
+#bellMessage .tc-bell-row-arrow{font-size:15px;flex:0 0 auto;color:var(--tc-body,#63728a);}
+#bellMessage .tc-bell-pdf-rows .tc-bell-early-choice{margin:0 0 3px;}
+@media(max-width:360px){#bellMessage .tc-bell-pdf-rows{padding-inline:7px;}#bellMessage .tc-bell-pdf-rows .tc-bell-row{gap:5px;padding:8px 6px;}#bellMessage .tc-bell-row-arrow{display:none;}}
+</style>
 </head>
 <body data-theme="light">
 
@@ -2939,7 +2970,7 @@ body[data-theme="dark"] #bellMessage .tc-bell-rating-heading{color:#e8efff;}
  <div class="search-wrap"><svg class="icon" aria-hidden="true"><use href="#i-search"></use></svg><input type="search" id="siteSearch" placeholder="Search your flashcards, sets, or history..." autocomplete="off" aria-label="Search flashcards"><kbd class="shortcut">Ctrl /</kbd><div class="search-results" id="searchResults"></div></div>
  <div class="top-actions">
   <button type="button" id="headerThemeToggle" class="tc-header-theme" aria-label="Switch to dark mode" title="Switch to Dark Mode"><svg class="icon tc-theme-icon tc-theme-moon" aria-hidden="true"><use href="#i-moon"></use></svg><svg class="icon tc-theme-icon tc-theme-sun" aria-hidden="true"><use href="#i-sun"></use></svg><span class="tc-theme-label">Dark Mode</span></button>
-  <div class="top-popovers"><button class="icon-button" id="bellButton" aria-label="Review notifications"><svg class="icon" aria-hidden="true"><use href="#i-bell"></use></svg><span class="notification-dot" id="noticeDot"></span></button><div class="floating-popover" id="bellPopover"><h4>Notifications &amp; review reminders</h4><button type="button" id="tcGeneratedReadyBell" hidden aria-label="View newly generated flashcards"><strong>✓ Flashcards ready</strong><span id="tcGeneratedReadyBellTitle" class="tc-ready-pdf-title"></span><span id="tcGeneratedReadyBellText"></span><small>Open Flashcard Sets</small></button><div id="bellMessage" class="tc-bell-dates" aria-live="polite">No reviews due right now.</div><button class="btn-primary" id="bellReview">Open Review</button></div></div>
+  <div class="top-popovers"><button class="icon-button" id="bellButton" aria-label="Review notifications"><svg class="icon" aria-hidden="true"><use href="#i-bell"></use></svg><span class="notification-dot" id="noticeDot"></span></button><div class="floating-popover" id="bellPopover"><h4>Notifications &amp; review reminders</h4><button type="button" id="tcGeneratedReadyBell" hidden aria-label="View newly generated flashcards"><strong>✓ Flashcards ready</strong><span id="tcGeneratedReadyBellTitle" class="tc-ready-pdf-title"></span><span id="tcGeneratedReadyBellText"></span><small>Open Flashcard Sets</small></button><div id="bellMessage" class="tc-bell-dates" aria-live="polite">No reviews due right now.</div></div></div>
   <span class="tc-header-separator" aria-hidden="true"></span>
   <button type="button" class="tc-header-icon" data-page="settings" aria-label="Settings" title="Settings"><svg class="icon" aria-hidden="true"><use href="#i-settings"></use></svg></button>
   <button type="button" class="tc-header-icon" data-page="help" aria-label="Help" title="Help"><svg class="icon" aria-hidden="true"><use href="#i-help"></use></svg></button>
@@ -3005,8 +3036,8 @@ body[data-theme="dark"] #bellMessage .tc-bell-rating-heading{color:#e8efff;}
   </div>
  </div>
 </section>
-<section id="sets"><button class="tc-back" onclick="appBack()"><svg class="tc-back-arrow" viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M19 12H5m7-7-7 7 7 7" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg><span>Back</span></button><div class="page-heading"><div class="page-heading-icon"><svg class="icon" aria-hidden="true"><use href="#i-layers"></use></svg></div><div><h1>Flashcard Sets</h1><p>Make sure your flashcards are just right before adding them to your study materials.</p></div></div><div class="content-stack" id="list"></div></section>
-<section id="review"><button class="tc-back" onclick="appBack()"><svg class="tc-back-arrow" viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M19 12H5m7-7-7 7 7 7" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg><span>Back</span></button><div class="page-heading"><div class="page-heading-icon"><svg class="icon" aria-hidden="true"><use href="#i-calendar"></use></svg></div><div><h1>Review</h1><p>Go through your flashcards at your own pace and prepare for your next review.</p></div></div><div class="content-stack" id="quiz"></div></section>
+<section id="sets"><button class="tc-back" onclick="appBack()"><svg class="tc-back-arrow" viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M19 12H5m7-7-7 7 7 7" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg><span>Back</span></button><div class="page-heading"><div class="page-heading-icon"><svg class="icon" aria-hidden="true"><use href="#i-layers"></use></svg></div><div><h1>Flashcard Sets</h1></div></div><div class="content-stack" id="list"></div></section>
+<section id="review"><button class="tc-back" onclick="appBack()"><svg class="tc-back-arrow" viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M19 12H5m7-7-7 7 7 7" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg><span>Back</span></button><div class="page-heading"><div class="page-heading-icon"><svg class="icon" aria-hidden="true"><use href="#i-calendar"></use></svg></div><div><h1>Review</h1></div></div><div class="content-stack" id="quiz"></div></section>
 <section id="history"><button class="tc-back" onclick="appBack()"><svg class="tc-back-arrow" viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M19 12H5m7-7-7 7 7 7" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg><span>Back</span></button>
 <div class="page-heading tc-history-heading"><div class="page-heading-icon"><svg class="icon" aria-hidden="true"><use href="#i-history"></use></svg></div><div class="tc-history-heading-copy"><h1>Review History</h1></div>
 <div class="tc-history-tools"><button type="button" id="historySearchToggle" class="tc-history-search-toggle" aria-controls="historySearchPanel" aria-expanded="false" onclick="toggleHistorySearch()"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 6h16M4 12h16M4 18h16"/><circle cx="9" cy="6" r="2.5" fill="var(--tc-history-button-bg,#fff)"/><circle cx="16" cy="12" r="2.5" fill="var(--tc-history-button-bg,#fff)"/><circle cx="10" cy="18" r="2.5" fill="var(--tc-history-button-bg,#fff)"/></svg><span>Filters / Search</span><span class="tc-history-search-active" id="historySearchActive" hidden></span></button><button type="button" id="clearReviewHistory" class="tc-history-clear-btn" onclick="clearReviewHistory()"><svg class="icon" aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18M8 6V4h8v2m3 0-1 14H6L5 6m5 4v6m4-6v6"/></svg><span>Clear Review History</span></button></div></div>
@@ -5352,6 +5383,9 @@ document.addEventListener('visibilitychange',()=>{
  }
 });
 
+
+// Open only the flashcards scheduled for the selected reminder date.
+// No review logs, history scores or other scheduled cards are deleted.
 function tcBellRatingOrder(){return ['Remembered','Partially Remembered','Difficult','Other scheduled reviews'];}
 function tcBellRatingMap(){
  const latest=new Map();
@@ -5363,19 +5397,20 @@ function tcBellCardRating(card,latest){
  const rating=log?.rating;
  return log&&log.next===card.next&&tcBellRatingOrder().slice(0,3).includes(rating)?rating:'Other scheduled reviews';
 }
+function tcBellPDF(card){return String(card.pdf||'PDF lecture').trim()||'PDF lecture';}
 function tcBellRatingGroups(){
  const latest=tcBellRatingMap(),groups=new Map();
  for(const card of scheduledCards()){
-  const day=tcReviewDayKey(card.next),rating=tcBellCardRating(card,latest),key=rating+'|'+day;
+  const day=tcReviewDayKey(card.next),rating=tcBellCardRating(card,latest),pdf=tcBellPDF(card),key=JSON.stringify([rating,day,pdf]);
   const when=new Date(card.next);
-  if(!groups.has(key))groups.set(key,{day,rating,when,count:0});
+  if(!groups.has(key))groups.set(key,{day,rating,pdf,when,count:0});
   const group=groups.get(key);group.count++;if(when<group.when)group.when=when;
  }
  return [...groups.values()].sort((a,b)=>tcBellRatingOrder().indexOf(a.rating)-tcBellRatingOrder().indexOf(b.rating)||a.when-b.when);
 }
-function tcStartReminderReview(day,rating){
+function tcStartReminderReview(day,rating,pdf){
  const latest=tcBellRatingMap();
- const matches=scheduledCards().filter(c=>tcReviewDayKey(c.next)===day&&(!rating||tcBellCardRating(c,latest)===rating));
+ const matches=scheduledCards().filter(c=>tcReviewDayKey(c.next)===day&&(!rating||tcBellCardRating(c,latest)===rating)&&tcBellPDF(c)===pdf);
  if(!matches.length){tcRenderBellSchedule();return;}
  const unfinished=session&&Array.isArray(session.ids)&&session.index<session.ids.length;
  const hasProgress=unfinished&&(Object.keys(session.answers||{}).length||Object.keys(session.results||{}).length);
@@ -5386,75 +5421,88 @@ function tcStartReminderReview(day,rating){
  show('review');
  window.scrollTo({top:0,behavior:'instant'});
 }
-function tcOpenBellReminder(day,rating){
+function tcOpenBellReminder(day,rating,pdf){
  if(!day)return;
- if(day<=tcTodayDayKey()){tcStartReminderReview(day,rating);return;}
+ if(day<=tcTodayDayKey()){tcStartReminderReview(day,rating,pdf);return;}
  const target=$('bellMessage');
- const row=[...target.querySelectorAll('.tc-bell-row')].find(item=>item.dataset.day===day&&item.dataset.rating===rating);
+ const row=[...target.querySelectorAll('.tc-bell-row')].find(item=>item.dataset.day===day&&item.dataset.rating===rating&&item.dataset.pdf===pdf);
  if(!row)return;
  const previous=target.querySelector('.tc-bell-early-choice');
- const wasOpen=previous?.dataset.day===day&&previous?.dataset.rating===rating;
+ const wasOpen=previous?.dataset.day===day&&previous?.dataset.rating===rating&&previous?.dataset.pdf===pdf;
  if(previous)previous.remove();
  target.querySelectorAll('.tc-bell-row').forEach(item=>item.setAttribute('aria-expanded','false'));
  if(wasOpen)return;
  row.setAttribute('aria-expanded','true');
  const choice=document.createElement('div');
- choice.className='tc-bell-early-choice';choice.dataset.day=day;choice.dataset.rating=rating;
+ choice.className='tc-bell-early-choice';choice.dataset.day=day;choice.dataset.rating=rating;choice.dataset.pdf=pdf;
  const date=new Date(day+'T12:00:00');
  const title=document.createElement('strong');title.textContent='Review ahead of schedule?';
  const detail=document.createElement('p');detail.textContent='Your review is scheduled for '+date.toLocaleDateString(undefined,{month:'short',day:'numeric',year:'numeric'})+'. Choose Review Now to study these cards early.';
  const actions=document.createElement('div');actions.className='tc-bell-early-actions';
  const now=document.createElement('button');now.type='button';now.className='tc-bell-review-early';now.textContent='Review Now';
- now.addEventListener('click',event=>{event.stopPropagation();tcStartReminderReview(day,rating);});
+ now.addEventListener('click',event=>{event.stopPropagation();tcStartReminderReview(day,rating,pdf);});
  const keep=document.createElement('button');keep.type='button';keep.className='tc-bell-keep-scheduled';keep.textContent='Keep Scheduled';
  keep.addEventListener('click',event=>{event.stopPropagation();choice.remove();row.setAttribute('aria-expanded','false');row.focus();});
  actions.append(now,keep);choice.append(title,detail,actions);row.insertAdjacentElement('afterend',choice);
-
+ // Scroll the options into view, including in the small mobile bell popover.
  requestAnimationFrame(()=>choice.scrollIntoView({block:'nearest',behavior:'smooth'}));
  now.focus({preventScroll:true});
 }
+function tcBellPDFGroups(){
+ const grouped=new Map();
+ for(const item of tcBellRatingGroups()){
+  if(!grouped.has(item.pdf))grouped.set(item.pdf,{pdf:item.pdf,total:0,items:[],firstDay:item.day});
+  const pdf=grouped.get(item.pdf);pdf.total+=item.count;pdf.items.push(item);
+  if(item.day<pdf.firstDay)pdf.firstDay=item.day;
+ }
+ const priority=['Difficult','Partially Remembered','Remembered','Other scheduled reviews'];
+ for(const pdf of grouped.values())pdf.items.sort((a,b)=>priority.indexOf(a.rating)-priority.indexOf(b.rating)||a.when-b.when);
+ return [...grouped.values()].sort((a,b)=>a.firstDay.localeCompare(b.firstDay)||a.pdf.localeCompare(b.pdf));
+}
 function tcRenderBellSchedule(){
  const target=$('bellMessage');if(!target)return;
- const groups=tcBellRatingGroups();
- target.replaceChildren();
- const dueNow=due().length;
- if(!groups.length){
-  target.textContent='No scheduled reviews yet. Rate your recall to set review dates.';
-  $('bellReview').disabled=dueNow===0;
-  $('bellReview').textContent=dueNow?'Open Review':'No Cards Due Yet';
-  return;
- }
- const today=tcTodayDayKey();
- let currentRating='';
- for(const group of groups){
-  if(currentRating!==group.rating){
-   currentRating=group.rating;
-   const heading=document.createElement('h5');heading.className='tc-bell-rating-heading';heading.textContent=currentRating;
-   target.appendChild(heading);
+ const pdfs=tcBellPDFGroups(),today=tcTodayDayKey();
+ // Do not close an expanded PDF or discard early-review choices on an unchanged refresh.
+ const signature=JSON.stringify([today,pdfs]);
+ if(target.dataset.scheduleSignature===signature)return;
+ const previouslyOpen=new Map([...target.querySelectorAll('.tc-bell-pdf-group')].map(el=>[el.dataset.pdf,el.open]));
+ target.replaceChildren();target.dataset.scheduleSignature=signature;
+ if(!pdfs.length){target.textContent='No scheduled reviews yet. Rate your recall to set review dates.';return;}
+ pdfs.forEach((pdf,index)=>{
+  const panel=document.createElement('details');panel.className='tc-bell-pdf-group';panel.dataset.pdf=pdf.pdf;
+  panel.open=previouslyOpen.has(pdf.pdf)?previouslyOpen.get(pdf.pdf):(!previouslyOpen.size&&index===0);
+  const summary=document.createElement('summary');
+  const icon=document.createElementNS('http://www.w3.org/2000/svg','svg');icon.setAttribute('class','icon tc-bell-pdf-icon');icon.setAttribute('aria-hidden','true');
+  const use=document.createElementNS('http://www.w3.org/2000/svg','use');use.setAttribute('href','#i-file');icon.appendChild(use);
+  const info=document.createElement('div');info.className='tc-bell-pdf-summary';
+  const title=document.createElement('strong');title.textContent=pdf.pdf;
+  const meta=document.createElement('small');
+  const dueCount=pdf.items.reduce((sum,item)=>sum+(item.day<=today?item.count:0),0);
+  meta.textContent=pdf.total+' card'+(pdf.total===1?'':'s')+' • '+(dueCount?dueCount+' due'+(dueCount<pdf.total?' · '+(pdf.total-dueCount)+' upcoming':''):'Upcoming reviews');
+  info.append(title,meta);
+  const chevron=document.createElement('span');chevron.className='tc-bell-chevron';chevron.setAttribute('aria-hidden','true');
+  summary.append(icon,info,chevron);
+  const rows=document.createElement('div');rows.className='tc-bell-pdf-rows';
+  for(const group of pdf.items){
+   const row=document.createElement('button');row.type='button';row.className='tc-bell-row';row.dataset.day=group.day;row.dataset.rating=group.rating;row.dataset.pdf=group.pdf;
+   const isDue=group.day<=today;if(isDue)row.classList.add('tc-bell-due');
+   row.setAttribute('aria-expanded','false');
+   const dateLabel=group.when.toLocaleDateString(undefined,{weekday:'short',month:'short',day:'numeric',year:'numeric'});
+   row.setAttribute('aria-label',`${group.pdf}, ${group.rating}: ${group.count} ${isDue?'due':'upcoming'} review cards on ${dateLabel}. ${isDue?'Open review':'Choose whether to review early'}.`);
+   const dot=document.createElement('span');dot.className='tc-bell-rating-dot '+({'Difficult':'difficult','Partially Remembered':'partial','Remembered':'remembered'}[group.rating]||'');dot.setAttribute('aria-hidden','true');
+   const detail=document.createElement('div');detail.className='tc-bell-pdf-detail';
+   const rating=document.createElement('strong');rating.textContent=group.rating;
+   const date=document.createElement('span');date.className='tc-bell-review-date';date.textContent=dateLabel+(isDue?' · Due':'');
+   detail.append(rating,date);
+   const count=document.createElement('div');count.className='tc-bell-count';count.textContent=group.count+' card'+(group.count===1?'':'s');
+   const arrow=document.createElement('div');arrow.className='tc-bell-row-arrow';arrow.textContent='›';arrow.setAttribute('aria-hidden','true');
+   row.append(dot,detail,count,arrow);row.title=dateLabel+' — '+(isDue?'Open due questions':'Review ahead of schedule or keep the date');
+   rows.appendChild(row);
   }
-  const row=document.createElement('button');row.type='button';row.className='tc-bell-row';row.dataset.day=group.day;row.dataset.rating=group.rating;
-  const isDue=group.day<=today;
-  if(isDue)row.classList.add('tc-bell-due');
-  row.setAttribute('aria-expanded','false');
-  row.setAttribute('aria-label',`${group.count} ${isDue?'due':'upcoming'} review cards on ${group.when.toLocaleDateString()}. ${isDue?'Open review':'Choose whether to review early'}.`);
-  const detail=document.createElement('div');
-  const date=document.createElement('strong');
-  date.textContent=group.when.toLocaleDateString(undefined,{weekday:'short',month:'short',day:'numeric',year:'numeric'});
-  const hint=document.createElement('span');hint.textContent=isDue?'Due for review':'Upcoming review';
-  const tapHint=document.createElement('span');tapHint.className='tc-bell-tap-hint';
-  tapHint.textContent=isDue?'Tap to review':'Tap for Review Now options';
-  detail.append(date,hint,tapHint);
-  const count=document.createElement('div');count.className='tc-bell-count';
-  count.textContent=group.count+' card'+(group.count===1?'':'s');
-  row.append(detail,count);
-  row.title=isDue?'Open due questions':'Review ahead of schedule or keep the date';
-  target.appendChild(row);
- }
- // The orange action remains usable when only upcoming cards exist.
- // It never erases an unfinished session or review history.
- $('bellReview').disabled=false;
- $('bellReview').textContent=dueNow?'Open Due Review':'Choose Review Date';
-}function renderDashboardStats(){
+  panel.append(summary,rows);target.appendChild(panel);
+ });
+}
+function renderDashboardStats(){
  const allPDFs=new Set(cards.map(c=>c.pdf).filter(Boolean));
  if(fileName)allPDFs.add(fileName);
  const data=[
@@ -5510,24 +5558,16 @@ function updateSearch(){
 $('siteSearch').addEventListener('input',updateSearch);
 document.addEventListener('keydown',(e)=>{if((e.ctrlKey||e.metaKey)&&e.key==='/'){e.preventDefault();$('siteSearch').focus();}if(e.key==='Escape'){$('searchResults').classList.remove('show');$('bellPopover').classList.remove('show');$('profilePopover').classList.remove('show');closeSidebar();}});
 document.addEventListener('click',(e)=>{if(!e.target.closest('.search-wrap'))$('searchResults').classList.remove('show');if(!e.target.closest('.top-popovers')){$('bellPopover').classList.remove('show');$('profilePopover').classList.remove('show');}});
-
+// A single delegated handler works even after reminder cards are rerendered.
 $('bellMessage').addEventListener('click',event=>{
  const row=event.target.closest('.tc-bell-row');
  if(row&&$('bellMessage').contains(row)){
   event.preventDefault();
-  tcOpenBellReminder(row.dataset.day,row.dataset.rating);
+  tcOpenBellReminder(row.dataset.day,row.dataset.rating,row.dataset.pdf);
  }
 });
 $('bellButton').onclick=()=>{tcRenderBellSchedule();$('bellPopover').classList.toggle('show');$('profilePopover').classList.remove('show');};
 $('profileButton').onclick=()=>{$('profilePopover').classList.toggle('show');$('bellPopover').classList.remove('show');};
-$('bellReview').onclick=()=>{
- const groups=tcBellRatingGroups().sort((a,b)=>a.when-b.when);
- if(!groups.length)return;
- const today=tcTodayDayKey();
- const dueGroup=groups.find(group=>group.day<=today);
- const selected=dueGroup||groups[0];
- tcOpenBellReminder(selected.day,selected.rating);
-};
 $('profileSettings').onclick=()=>{$('profilePopover').classList.remove('show');show('settings');};
 const savedTheme=(()=>{try{return tcStore.getItem(themeKey)==='dark'?'dark':'light'}catch(e){return 'light'}})(); // Respect saved appearance
 applyTheme(savedTheme);
@@ -5553,6 +5593,7 @@ tcBgRefreshReadyBell();
 tcBgRestoreAfterLoad();
 tcUpdateCancelButton();
 
+// Header controls share the existing theme and navigation logic.
 document.getElementById('headerThemeToggle')?.addEventListener('click',()=>{
  applyTheme(document.body.getAttribute('data-theme')==='dark'?'light':'dark');
 });
@@ -5565,9 +5606,10 @@ document.querySelectorAll('.tc-header-icon[data-page]').forEach(button=>{
 });
 
 
+// Keep resumable progress in sync with changed generation settings.
 ['questionType','count','cardAmount'].forEach(id=>$(id).addEventListener('change',tcSavedDraftSummary));
 
-
+// Three themed dropdowns. The original <select> elements remain the source of truth for generation.
 (function setupGenerationDropdowns(){
  const ids=['questionType','count','cardAmount'];
  const controls=[];
@@ -5750,7 +5792,7 @@ document.querySelectorAll('.tc-header-icon[data-page]').forEach(button=>{
    panel.addEventListener('mouseenter',()=>{if(canHover){hovered=true;stop();}});
    panel.addEventListener('mouseleave',()=>{if(canHover){hovered=false;start();}});
    document.addEventListener('visibilitychange',()=>{if(document.hidden)stop();else start();});
-
+   // The Help slideshow starts when Help opens and pauses when another page is active.
    new MutationObserver(()=>{if(section.classList.contains('active'))start();else stop();})
     .observe(section,{attributes:true,attributeFilter:['class']});
    showImmediately(0);
