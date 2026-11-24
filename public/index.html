@@ -3473,9 +3473,41 @@ const tcReviewKnownAcronyms=Object.freeze({
  dna:'deoxyribonucleic acid',rna:'ribonucleic acid',
  atp:'adenosine triphosphate',
 });
+// Recognize an explicitly paired expansion and acronym without dropping other
+// parenthetical information (numbers, qualifiers, conditions, etc.).
+function tcReviewExplicitAcronym(value){
+ const text=String(value??'').normalize('NFKC').trim().replace(/[.!?]$/,'').trim();
+ const match=text.match(/^([^()]+?)\s*\(\s*([^()]+?)\s*\)$/u);
+ if(!match)return null;
+ const candidates=[[match[1],match[2]],[match[2],match[1]]];
+ for(const [longRaw,shortRaw] of candidates){
+  const long=tcAnswerCompact(longRaw),short=tcAnswerCompact(shortRaw);
+  if(!/^[a-z]{2,12}$/.test(short)||!/^\p{L}+(?: \p{L}+)+$/u.test(long))continue;
+  const known=Object.hasOwn(tcReviewKnownAcronyms,short);
+  const words=long.split(' ');
+  const initials=words.map(w=>w[0]).join('');
+  const coreInitials=words.filter(w=>!['a','an','the','of','and','for','in','to','on'].includes(w)).map(w=>w[0]).join('');
+  if(known?tcReviewKnownAcronyms[short]===long:(initials===short||coreInitials===short))return {long,short};
+ }
+ return null;
+}
+function tcReviewPairedAcronymMatch(actual,target,question){
+ const a=tcReviewExplicitAcronym(actual),b=tcReviewExplicitAcronym(target);
+ if(!a&&!b)return false;
+ const actualKey=tcAnswerCompact(actual),targetKey=tcAnswerCompact(target);
+ const requiresLong=/\b(?:full form|full name|full term|complete name|complete term|exact name|exact term|exact wording|spell out|write in full|stand for|stands for|expand)\b/i.test(question);
+ const requiresShort=/\b(?:abbreviation|acronym|initialism|short form)\s+(?:for|of)\b|\babbreviate\b/i.test(question)&&!requiresLong;
+ if(a&&b)return a.long===b.long&&a.short===b.short;
+ if(b)return (!requiresShort&&actualKey===b.long)||(!requiresLong&&actualKey===b.short);
+ // A student's explicit pair is accepted only if both parts agree with each
+ // other and the expected answer is one of those parts.
+ return (!requiresShort&&targetKey===a.long)||(!requiresLong&&targetKey===a.short)||
+  (requiresLong&&targetKey===a.short)||(requiresShort&&targetKey===a.long);
+}
 function tcReviewAcronymMatch(actual,target,question){
  if(/\b(?:full form|full name|full term|complete name|complete term|exact name|exact term|exact wording|spell out|write in full|stand for|stands for|expand)\b/i.test(question))return false;
  const a=tcAnswerCompact(actual),b=tcAnswerCompact(target);
+ if(/\b(?:abbreviation|acronym|initialism|short form)\s+(?:for|of)\b|\babbreviate\b/i.test(question)&&!/^[a-z]{2,12}$/.test(a))return false;
  const pair=(short,long,rawShort)=>{
   if(!/^[a-z]{2,12}$/.test(short)||!/^\p{L}+(?: \p{L}+)+$/u.test(long))return false;
   if(Object.hasOwn(tcReviewKnownAcronyms,short))return tcReviewKnownAcronyms[short]===long;
@@ -3575,61 +3607,162 @@ function tcReviewTextVariant(actual,target,question){
  if(spelling)return 'Equivalent spelling accepted.';
  return '';
 }
-function tcEquivalentReviewAnswer(given,expected,question=''){
- const actual=String(given??'').trim(),target=String(expected??'').trim();
- if(!actual||!target)return {correct:false,note:''};
- const actualKey=tcAnswerCompact(actual),expectedKey=tcAnswerCompact(target);
+// Compare only answer-equivalent variants; never award credit for mere overlap.
+function tcReviewStrictMode(question){
  const q=String(question??'');
- const exactTerm=/\b(?:full form|full name|full term|complete name|complete term|exact name|exact term|exact wording|spell out|write in full|stand for|stands for|expand)\b/i.test(q);
- if(actualKey&&actualKey===expectedKey){
-  return {correct:true,note:actual.toLocaleLowerCase()===target.toLocaleLowerCase()?'':'Equivalent formatting accepted.'};
- }
- // Numeric mismatches must not reach a shorter-answer or typo rule.
- const numericTokens=value=>value.match(/[+\-]?\d+(?:\.\d+)?/g)||[];
- if(JSON.stringify(numericTokens(actualKey))!==JSON.stringify(numericTokens(expectedKey)))return {correct:false,note:''};
- if(!exactTerm&&actualKey&&expectedKey&&actualKey.replace(/^(?:the|an|a) /,'')===expectedKey.replace(/^(?:the|an|a) /,''))return {correct:true,note:'Equivalent wording accepted.'};
- if(tcReviewAcronymMatch(actual,target,q))return {correct:true,note:'Equivalent abbreviation accepted.'};
- if(!exactTerm&&/^(?:singular|plural)(?: form)?$/.test(actualKey)&&/^(?:singular|plural)(?: form)?$/.test(expectedKey)&&actualKey.replace(/ form$/,'')===expectedKey.replace(/ form$/,''))return {correct:true,note:'Equivalent grammatical form accepted.'};
- const variation=exactTerm?'':tcReviewTextVariant(actual,target,question);
- if(variation)return {correct:true,note:variation};
- // One final category noun can be redundant when the question asks for that
- // category. E.g. 'primary' for 'primary colors' in a question about colors;
- // 'sodium-potassium' for 'sodium-potassium pump' in a question about a pump.
- // Do not accept arbitrary partial answers or missing descriptive terms.
- const categoryWords=new Set([
-  'color','pump','process','system','theory','law','principle','method',
-  'model','mechanism','reaction','enzyme','organ','organelle','structure',
-  'protocol','algorithm','shape','pattern','category','classification',
-  'type','group','layer','stage','phase','cycle','wave',
-  'form','tense','voice','mood'
- ]);
- const words=target.match(/[\p{L}]+/gu)||[];
- const finalWord=words.length>1?words[words.length-1].toLocaleLowerCase():'';
- const category=tcReviewCategoryBase(finalWord);
- if(categoryWords.has(category)){
-  const q=String(question??'').toLocaleLowerCase();
-  const qWords=(q.match(/[\p{L}]+/gu)||[]).map(tcReviewCategoryBase);
-  const knownColors=['red','blue','yellow','green','cyan','magenta','black','white','orange','violet'];
-  const impliedColorTopic=category==='color'&&(
-   qWords.some(w=>['hue','pigment','rgb','cmyk'].includes(w))||
-   new Set(qWords.filter(w=>knownColors.includes(w))).size>=2
-  );
-  const categoryAsked=qWords.includes(category)||impliedColorTopic;
-  const withoutCategory=target.replace(/\s+[\p{L}]+\s*[.!?]?$/u,'').trim();
-  const shortKey=tcAnswerCompact(withoutCategory);
-  // If the question requires a full or exact term, do not drop a category word.
-  const requiresFullTerm=/\b(?:full form|full name|full term|complete name|complete term|exact name|exact term|exact wording|spell out|write in full|stand for|stands for)\b/i.test(q);
-  // Compare whole words rather than joined text when accepting a shorter answer.
-  // Only the final, question-supplied category may be omitted; all other words
-  // must match (or be a previously supported spelling/inflection variant).
-  const shortTokens=value=>String(value).normalize('NFKC').toLocaleLowerCase().match(/[\p{L}\p{M}\p{N}]+/gu)||[];
-  const sameShortWords=/^[\p{L}\p{M}\p{N}\s\u2010-\u2015\-]+[.!?]?$/u.test(actual)&&/^[\p{L}\p{M}\p{N}\s\u2010-\u2015\-]+[.!?]?$/u.test(withoutCategory)&&JSON.stringify(shortTokens(actual))===JSON.stringify(shortTokens(withoutCategory));
-  const shortVariation=tcReviewTextVariant(actual,withoutCategory,question);
-  if(categoryAsked&&!requiresFullTerm&&shortKey.length>=3&&(sameShortWords||shortVariation)){
-   return {correct:true,note:`Accepted: “${finalWord}” was already indicated in the question.`};
+ if(/\b(?:full form|full name|full term|complete name|complete term|spell out|write in full|stand for|stands for|expand)\b/i.test(q))return 'long';
+ if(/\b(?:abbreviation|acronym|initialism|short form)\s+(?:for|of)\b|\babbreviate\b|\bwhat\s+(?:is|are)\s+the\s+(?:abbreviation|acronym|initialism|short form)\b/i.test(q))return 'short';
+ if(/\b(?:exact (?:name|term|wording|spelling)|scientific name|chemical (?:formula|symbol)|technical term|spell(?:ing)?|verbatim)\b/i.test(q))return 'exact';
+ return '';
+}
+function tcReviewComparisonKey(value){
+ let text=String(value??'').normalize('NFC').trim()
+  .replace(/[\u2010-\u2015\u2212]/g,'-').replace(/[’‘]/g,"'")
+  .replace(/[\u00a0\u202f]/g,' ');
+ // Case is significant in symbolic expressions (e.g. mV vs MV, CO vs Co).
+ // Only valid thousands-group separators can be removed. Preserve operators,
+ // scientific notation, and exact integer precision rather than rounding with Number().
+ return tcAnswerCompact(text)
+  .replace(/\b\d{1,3}(?:,\d{3})+(?![\d,])/g,m=>m.replace(/,/g,''))
+  .replace(/(?<![\p{L}\d.])([+-]?\d+(?:\.\d+)?)(?![\d.])/gu,(whole,n,offset,all)=>{
+   // A sign inside a mathematical expression is not an optional plus sign.
+   if(/[\d)]+$/.test(all.slice(0,offset).trimEnd())&&/^[+-]/.test(n))return whole;
+   const sign=n.startsWith('-')?'-':n.startsWith('+')?'+':'';
+   let [integer,decimal='']=n.replace(/^[+-]/,'').split('.');
+   integer=integer.replace(/^0+(?=\d)/,'');decimal=decimal.replace(/0+$/,'');
+   // A leading plus sign is redundant only for a standalone scalar, not a formula.
+   const keepPlus=sign==='+'&&/[^\s]/.test(all.slice(0,offset));
+   return (sign==='-'&&(integer!=='0'||decimal)?'-':keepPlus?'+':'')+integer+(decimal?'.'+decimal:'');
+  });
+}
+function tcReviewSymbolConflict(a,b,q){
+ const symbolic=/\b(?:chemical (?:formula|symbol|equation)|element symbol|case.sensitive|SI prefix|unit symbol|programming identifier|variable name|code|password)\b/i.test(q);
+ if(symbolic)return a.normalize('NFC').trim()!==b.normalize('NFC').trim();
+ // Metric prefix case can change the value. Keep unit symbols case-sensitive.
+ const units=x=>[...x.matchAll(/(?:\d\s*|^)([mMkKgGTμµnpu]?[VAWJHzF])\b/g)].map(m=>m[1]);
+ const ua=units(a),ub=units(b);
+ return ua.length>0&&ub.length>0&&ua.length===ub.length&&ua.some((v,i)=>v!==ub[i]&&v.toLowerCase()===ub[i].toLowerCase());
+}
+function tcReviewAcronymForms(value){
+ const pair=tcReviewExplicitAcronym(value);
+ if(pair)return pair;
+ const key=tcReviewComparisonKey(value);
+ if(Object.hasOwn(tcReviewKnownAcronyms,key))return {short:key,long:tcReviewKnownAcronyms[key]};
+ for(const [short,long] of Object.entries(tcReviewKnownAcronyms))if(key===long)return {short,long};
+ return null;
+}
+function tcReviewAcronymEquivalent(actual,target,q,source,mode){
+ if(mode==='exact')return false;
+ const a=tcReviewComparisonKey(actual),b=tcReviewComparisonKey(target);
+ const pairs=[tcReviewAcronymForms(actual),tcReviewAcronymForms(target)].filter(Boolean);
+ // Source-defined acronym pairs: use only an explicit expansion with matching initials.
+ const sourceText=String(source??'');
+ for(const match of sourceText.matchAll(/\b([\p{L}]+(?:[ -][\p{L}]+){1,11})\s*\(([A-Z][A-Z.]{1,14})\)/gu)){
+  const words=match[1].split(/\s+/);
+  for(let i=0;i<words.length-1;i++){
+   const pair=tcReviewExplicitAcronym(words.slice(i).join(' ')+' ('+match[2]+')');
+   if(pair)pairs.push(pair);
   }
  }
- return {correct:false,note:''};
+ for(const pair of pairs){
+  const aPair=tcReviewExplicitAcronym(actual),bPair=tcReviewExplicitAcronym(target);
+  const fits=(key,p)=>key===pair.short||key===pair.long||(p&&p.short===pair.short&&p.long===pair.long);
+  if(!fits(a,aPair)||!fits(b,bPair))continue;
+  if(mode==='long'&&!(a===pair.long||aPair?.long===pair.long))continue;
+  if(mode==='short'&&!(a===pair.short||aPair?.short===pair.short))continue;
+  return true;
+ }
+ return false;
+}
+function tcReviewCategoryOmission(actual,target,q,mode){
+ if(mode)return false;
+ const a=tcReviewComparisonKey(actual),b=tcReviewComparisonKey(target);
+ const categoryWords=new Set(['color','pump','process','system','theory','law','principle','method','model','mechanism','reaction','enzyme','organ','organelle','structure','protocol','algorithm','shape','pattern','category','classification','type','group','layer','stage','phase','cycle','wave','form','tense','voice','mood','device','network','memory','language','function','number','unit','energy','force','cell','tissue','acid']);
+ // Only remove a final noun explicitly supplied by the question, not arbitrary content.
+ function canOmit(long,short){
+  const words=long.split(' '),last=words.at(-1),base=tcReviewCategoryBase(last);
+  if(words.length<2||!categoryWords.has(base)||words.slice(0,-1).join(' ')!==short||short.length<2)return false;
+  if(/^(singular|plural) form$/.test(long))return true;
+  // Ask for the category directly or supply it directly after a blank.
+  const escaped=base.replace(/[.*+?^${}()|[\]\\]/g,'\\$&');
+  const noun=`${escaped}(?:s|es)?`;
+  const direct=new RegExp(`\\b(?:what|which)\\s+(?:(?:kind|type|form|category)\\s+of\\s+|(?:is|are|was|were)\\s+(?:the\\s+)?(?:name\\s+of\\s+(?:the\\s+)?)?)?${noun}\\b|\\b(?:what|which)\\s+(?:is|are)\\s+the\\s+(?:kind|type|form|category)\\s+of\\s+${noun}\\b|_{2,}\\s+${noun}\\b`,'i');
+  if(direct.test(q))return true;
+  // A question that supplies the exact omitted category immediately after the blank.
+  return false;
+ }
+ // Do not accept a missing quantity, negation, or distinguishing qualifier.
+ return canOmit(b,a)||canOmit(a,b);
+}
+function tcEquivalentReviewAnswer(given,expected,question='',source=''){
+ const actual=String(given??'').trim(),target=String(expected??'').trim(),q=String(question??'');
+ const result=(correct,note='')=>({correct,note});
+ if(!actual||!target)return result(false);
+ const mode=tcReviewStrictMode(q);
+ if(tcReviewSymbolConflict(actual,target,q))return result(false);
+ const a=tcReviewComparisonKey(actual),b=tcReviewComparisonKey(target);
+ if(!a||!b)return result(false);
+ // An exact answer may still be invalid for a malformed question requiring a different acronym form;
+ // otherwise the approved reference answer remains authoritative.
+ if(a===b){
+  const known=tcReviewAcronymForms(target);
+  if(known&&((mode==='long'&&a===known.short)||(mode==='short'&&a===known.long)))return result(false);
+  return result(true,actual.toLowerCase()===target.toLowerCase()?'':'Equivalent formatting accepted.');
+ }
+ const nums=x=>x.match(/[+-]?\d+(?:\.\d+)?/g)||[];
+ if(JSON.stringify(nums(a))!==JSON.stringify(nums(b)))return result(false);
+ if(tcReviewAcronymEquivalent(actual,target,q,source,mode))return result(true,'Equivalent abbreviation accepted.');
+ if(mode)return result(false);
+ // Leading articles and sentence wrappers are not substantive; do not drop arbitrary words.
+ const core=x=>x.replace(/^(?:the answer is|it is|this is)\s+/,'').replace(/^(?:the|an|a) /,'').trim();
+ if(core(a)&&core(a)===core(b))return result(true,'Equivalent wording accepted.');
+ if(tcReviewCategoryOmission(core(a),core(b),q,mode))return result(true,'Accepted: the question already indicates the omitted term.');
+ // A number may omit a unit only when the question explicitly states the required unit.
+ const quantity=x=>x.match(/^([+-]?\d+(?:\.\d+)?)(?:\s*(°[cf]|[a-z]+))?$/);
+ const qa=quantity(a),qb=quantity(b);
+ if(qa&&qb&&qa[1]===qb[1]&&Boolean(qa[2])!==Boolean(qb[2])){
+  const unit=qa[2]||qb[2];
+  const aliases={'°c':'(?:degrees?\\s+celsius|celsius|°\\s*c)','°f':'(?:degrees?\\s+fahrenheit|fahrenheit|°\\s*f)',day:'days?',days:'days?',hour:'hours?',hours:'hours?',minute:'minutes?',minutes:'minutes?',second:'seconds?',seconds:'seconds?',meter:'met(?:er|re)s?',meters:'met(?:er|re)s?',kilograms:'kilograms?',kg:'(?:kg|kilograms?)',cm:'(?:cm|centimet(?:er|re)s?)',mv:'(?:mv|millivolts?)',percent:'(?:percent|%)'};
+  const pattern=aliases[unit];
+  if(pattern&&new RegExp(`(?:\\bhow many\\s+${pattern}(?:\\b|(?=\\s))|\\b(?:in|measured in|expressed in)\\s+${pattern}(?:\\b|(?=\\s|$))|_{2,}\\s*${pattern}(?:\\b|(?=\\s|$)))`,'i').test(q))return result(true,'Accepted: the required unit is supplied by the question.');
+ }
+ // Simple verb/gerund equivalence, without ignoring a missing object or qualifier.
+ const verbPairs=[['store','storing'],['process','processing'],['transfer','transferring'],['convert','converting'],['protect','protecting'],['control','controlling'],['regulate','regulating'],['produce','producing'],['transport','transporting'],['manage','managing'],['maintain','maintaining'],['generate','generating'],['identify','identifying'],['measure','measuring'],['reduce','reducing'],['increase','increasing'],['provide','providing'],['support','supporting'],['remove','removing'],['absorb','absorbing'],['release','releasing']];
+ const action=x=>{const m=x.match(/^(?:to )?([a-z]+) (.+)$/);if(!m)return '';const pair=verbPairs.find(p=>p.includes(m[1]));return pair?pair[0]+' '+m[2]:'';};
+ if(/\b(?:function|purpose|role|used for|what does|what is .* used)\b/i.test(q)&&action(a)&&action(a)===action(b))return result(true,'Equivalent action accepted.');
+ // Regional spelling and conservative typos; do not generalize to different terminology.
+ const sourceKey=tcReviewComparisonKey(source);
+ const exactInSource=sourceKey&&new RegExp(`(?:^|[^\\p{L}\\p{N}])${a.replace(/[.*+?^${}()|[\]\\]/g,'\\$&')}(?:$|[^\\p{L}\\p{N}])`,'u').test(sourceKey);
+ const variation=tcReviewTextVariant(actual,target,q);
+ if(variation){
+  if(/typing/.test(variation)&&exactInSource)return result(false);
+  if(/plural/.test(variation)&&/\b(?:one|single|each|individual|how many|number of|singular|plural|enumerate|list|give|name (?:a|an|one)|which (?:of|one))\b/i.test(q))return result(false);
+  return result(true,variation);
+ }
+ return result(false);
+}
+// Match enumeration one-to-one (not greedily), preserving every required item.
+function tcReviewEnumItems(value){
+ const text=String(value??'');
+ // Generated enumeration answers use semicolons. Preserve commas within each
+ // item in that format, including thousands separators and descriptive phrases.
+ if(/[;\n]/.test(text))return text.split(/[;\n]+/).map(x=>x.trim()).filter(Boolean);
+ return text.replace(/\b\d{1,3}(?:,\d{3})+(?![\d,])/g,m=>m.replace(/,/g,'')).split(/,+/).map(x=>x.trim()).filter(Boolean);
+}
+function tcReviewEnumerationMatch(given,expected,question='',source=''){
+ const targets=tcReviewEnumItems(expected),responses=Array.isArray(given)?given.map(x=>String(x??'').trim()).filter(Boolean):tcReviewEnumItems(given);
+ const owner=Array(responses.length).fill(-1);
+ const edges=targets.map(t=>responses.map(r=>tcEquivalentReviewAnswer(r,t,question,source).correct));
+ function assign(t,seen){for(let j=0;j<responses.length;j++){if(!edges[t][j]||seen.has(j))continue;seen.add(j);if(owner[j]===-1||assign(owner[j],seen)){owner[j]=t;return true;}}return false;}
+ let hits=0;for(let i=0;i<targets.length;i++)if(assign(i,new Set()))hits++;
+ return {correct:targets.length>0&&hits===targets.length&&responses.length===targets.length,note:`${hits}/${targets.length} expected items matched`};
+}
+
+function tcReviewMcqMatch(selected,expected,choices){
+ const a=String(selected??'').trim(),b=String(expected??'').trim();
+ if(a===b)return true;
+ const opts=(choices||[]).map(x=>String(x??'').trim());
+ return !opts.includes(b)&&a.toLowerCase()===b.toLowerCase()&&opts.filter(x=>x.toLowerCase()===b.toLowerCase()).length===1;
 }
 
 function distribution(n,type){if(type!=='mixed')return {[type]:n};const types=['mcq','identification','enumeration','fillblank'];const base=Math.floor(n/4),extra=n%4;return Object.fromEntries(types.map((t,i)=>[t,base+(i<extra?1:0)]));}
@@ -5125,7 +5258,7 @@ function tcProofInit(){
  saveSessionOnly();
 }
 async function tcProofPost(path,body){
- const controller=new AbortController(),timer=setTimeout(()=>controller.abort(),15000);
+ const controller=new AbortController(),timer=setTimeout(()=>controller.abort(),path==='claim'?45000:15000);
  try{
   const res=await fetch('/api/research/review/'+path,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body),signal:controller.signal,cache:'no-store'});
   const data=await res.json();if(!res.ok||!data.ok)throw Error(data.error||'Verification temporarily unavailable.');return data;
@@ -5185,10 +5318,12 @@ function tcProofUpdatePanel(){
    catch{$('tcCopyCompletionStatus').textContent='Select and copy the code manually.';}
   };
  }else if(proof?.code){
-  panel.innerHTML=`<h3>Activity Completed!</h3><p>Enter the same student email you will use in the research survey to claim your completion code. This is optional for ordinary app use.</p><form id="tcResearchClaimForm"><label class="tc-research-email">Student Email<input id="tcResearchEmail" type="email" maxlength="254" autocomplete="email" required placeholder="Enter your student email"></label><button type="submit" id="tcResearchClaimButton">Claim Completion Code</button><p id="tcResearchClaimStatus" role="status"></p></form><small>Your email and activity verification record are retained for up to 90 days. Your score does not affect eligibility.</small>`;
+  panel.innerHTML=`<h3>Activity Completed!</h3><p>Enter the same official CvSU email you will use in the research survey to claim your completion code. This is optional for ordinary app use.</p><form id="tcResearchClaimForm"><label class="tc-research-email">Student Email<input id="tcResearchEmail" type="email" maxlength="254" autocomplete="email" required placeholder="Enter your CvSU email"></label><button type="submit" id="tcResearchClaimButton">Claim Completion Code</button><p id="tcResearchClaimStatus" role="status"></p></form><small>Your email and completion code will be saved in the research team’s records for survey verification. The server activity record expires after 90 days. Your score does not affect eligibility.</small>`;
   $('tcResearchClaimForm').onsubmit=async event=>{
    event.preventDefault();const button=$('tcResearchClaimButton'),status=$('tcResearchClaimStatus');
-   if(button.disabled)return;button.disabled=true;status.textContent='Claiming your code…';
+   if(button.disabled)return;
+   if(!/^[a-z0-9._%+\-]+@cvsu\.edu\.ph$/i.test($('tcResearchEmail').value.trim())){status.textContent='Please enter your official CvSU email address (@cvsu.edu.ph).';return;}
+   button.disabled=true;status.textContent='Claiming and saving your code…';
    try{
     const result=await tcProofPost('claim',{sessionId:proof.sessionId,jobId:proof.jobId,email:$('tcResearchEmail').value.trim()});
     if(!tcProofCodePattern.test(result.code||''))throw Error('Invalid verification response. Please retry.');
@@ -5285,8 +5420,8 @@ function drawReview(){
  const c=tcFindReviewCard(session.ids[session.index]);if(!c)return;
  const type=cardType(c),saved=session.answers[c.id];
  // Enumeration gets one field per expected item; counts are derived from the stored answer, never exposed as clues.
- const enumCount=type==='enumeration'?Math.max(2,answerParts(c.a).length):0;
- const savedEnum=type==='enumeration'?(Array.isArray(saved?.enumFields)?saved.enumFields:String(saved?.answer||'').split(/[,;\n]+/).map(x=>x.trim())):[];
+ const enumCount=type==='enumeration'?Math.max(2,tcReviewEnumItems(c.a).length):0;
+ const savedEnum=type==='enumeration'?(Array.isArray(saved?.enumFields)?saved.enumFields:tcReviewEnumItems(saved?.answer||'')):[];
  const fields=type==='mcq'
   ?c.opts.map((v,i)=>`<label class="choice"><input type="radio" name="pick" value="${i}" ${saved?.answer===v?'checked':''}>${safe(v)}</label>`).join('')
   :type==='enumeration'
@@ -5348,22 +5483,14 @@ function drawReview(){
   }
   let correct=false,partial='';
   if(type==='enumeration'){
-   const expected=String(c.a||'').split(/[,;\n]+/).map(x=>x.trim()).filter(Boolean);
-   const remaining=String(selected||'').split(/[,;\n]+/).map(x=>x.trim()).filter(Boolean);
-   let hits=0;
-   for(const item of expected){
-    const at=remaining.findIndex(given=>tcEquivalentReviewAnswer(given,item,c.q).correct);
-    if(at>=0){remaining.splice(at,1);hits++;}
-   }
-   correct=hits===expected.length&&remaining.length===0;
-   partial=`${hits}/${expected.length} expected items matched`;
+   const match=tcReviewEnumerationMatch(enumInputs.map(input=>input.value),c.a,c.q,c.excerpt);
+   correct=match.correct;partial=match.note;
   }else{
-   const match=type==='mcq'?{correct:normalizeAnswer(selected)===normalizeAnswer(c.a),note:''}
-    :tcEquivalentReviewAnswer(selected,c.a,c.q);
-   correct=match.correct;
-   partial=match.note;
+   const match=type==='mcq'?{correct:tcReviewMcqMatch(selected,c.a,c.opts),note:''}
+    :tcEquivalentReviewAnswer(selected,c.a,c.q,c.excerpt);
+   correct=match.correct;partial=match.note;
   }
-  const result={answer:selected,correct,partial,checked:true};
+  const result={answer:selected,correct,partial,checked:true,...(type==='enumeration'?{enumFields:enumInputs.map(input=>input.value.trim())}:{})};
   session.answers[c.id]=result;session.results[c.id]=correct;
   saveSessionOnly();refreshReviewProgress();reveal(result);
  }
