@@ -2837,8 +2837,9 @@ body[data-theme="dark"] #tcGeneratedReadyBell:hover{background:#22503d}
 #tcManageDataDialog button:disabled,#tcManageDataDialog label:has(input:disabled){opacity:.5;cursor:not-allowed}
 body[data-theme="dark"] #tcManageDataDialog .tc-manage-option{border-color:#4a5b79}
 body[data-theme="dark"] #tcManageDataDialog .tc-manage-option small{color:#c5d0e6}
-#settings #tcManageDataOpen{display:inline-flex;align-items:center;gap:8px;color:#a6430d;background:#fff5ec;border:1px solid #f2c6b1}
-body[data-theme="dark"] #settings #tcManageDataOpen{color:#ffd1b5;background:#293a56;border-color:#4a5b79}
+#settings #tcManageDataOpen{display:inline-flex;align-items:center;gap:8px}
+#settings #tcManageDataOpen .icon{width:18px;height:18px}
+
 </style>
 <style id="tc-clear-confirm-design">
 /* Styled, accessible replacement for native browser confirms when clearing data. */
@@ -3013,7 +3014,26 @@ body[data-theme="dark"] #bellMessage .tc-bell-chevron {color:#bac9e1!important;o
   body[data-theme="dark"] .sidebar #headerThemeToggle {color:#f0f4ff!important;background:#29364e!important;border-color:#4e5b73!important;}
 }
 </style>
-</head>
+<style id="tc-settings-switches">
+#settings .tc-setting-switch-row{display:flex;align-items:center;justify-content:space-between;gap:18px}
+#settings .tc-setting-switch-copy{flex:1;min-width:0}
+#settings .tc-setting-switch-copy h3{margin:0 0 6px}
+#settings .tc-setting-switch-copy p{margin:0}
+#settings button.tc-setting-switch{appearance:none;display:inline-flex;align-items:center;justify-content:flex-start;flex:0 0 52px;width:52px;min-width:52px;height:44px;min-height:44px;padding:0;border:0;border-radius:24px;background:transparent!important;box-shadow:none!important;position:relative;cursor:pointer;transform:none!important}
+#settings button.tc-setting-switch::before{content:"";position:absolute;left:2px;right:2px;height:27px;border-radius:24px;background:#a3afbd;border:1px solid transparent;transition:background .18s ease}
+#settings button.tc-setting-switch span{position:relative;margin-left:6px;width:21px;height:21px;flex:0 0 21px;border-radius:50%;background:#fff;box-shadow:0 1px 3px #0003;transition:transform .18s ease}
+#settings button.tc-setting-switch[aria-checked="true"]::before{background:#1679bd}
+#settings button.tc-setting-switch[aria-checked="true"] span{transform:translateX(19px)}
+#settings button.tc-setting-switch:focus-visible{outline:2px solid #1689d5;outline-offset:3px}
+#settings button.tc-setting-switch:disabled{opacity:.5;cursor:not-allowed}
+body[data-theme="dark"] #settings button.tc-setting-switch[aria-checked="false"]::before{background:#47566f}
+body[data-theme="dark"] #settings button.tc-setting-switch[aria-checked="true"]::before{background:#2187c9}
+#settings #notificationStatus:empty,#settings #tcSettingsCalendarDates[hidden]{display:none!important}
+#settings #notificationStatus:not(:empty){display:block;margin-top:10px}
+#settings #tcSettingsCalendarDates{margin-top:14px;display:grid;gap:10px}
+#settings #tcSettingsCalendarDates .tc-calendar-date-row{min-width:0}
+@media(prefers-reduced-motion:reduce){#settings .tc-setting-switch::before,#settings .tc-setting-switch span{transition:none}}
+</style></head>
 <body data-theme="light">
 
 <svg xmlns="http://www.w3.org/2000/svg" width="0" height="0" style="position:absolute;overflow:hidden" aria-hidden="true"><defs><symbol id="i-home" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m3 10 9-7 9 7v10a1 1 0 0 1-1 1h-6v-7h-4v7H4a1 1 0 0 1-1-1z"/></symbol><symbol id="i-layers" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m12 2 10 6-10 6L2 8z"/><path d="m2 12 10 6 10-6M2 16l10 6 10-6"/></symbol><symbol id="i-calendar" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M7 2v6M17 2v6M3 10h18M7 14h.01M12 14h.01M17 14h.01M7 18h.01M12 18h.01"/></symbol><symbol id="i-history" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 11a9 9 0 1 1 3 7M3 4v7h7"/><path d="M12 7v5l4 2"/></symbol><symbol id="i-settings" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3a2 2 0 0 0-2 2v1a8 8 0 0 0-2 1L7 6a2 2 0 0 0-3 3l1 1a8 8 0 0 0 0 4l-1 1a2 2 0 0 0 3 3l1-1a8 8 0 0 0 2 1v1a2 2 0 0 0 4 0v-1a8 8 0 0 0 2-1l1 1a2 2 0 0 0 3-3l-1-1a8 8 0 0 0 0-4l1-1a2 2 0 0 0-3-3l-1 1a8 8 0 0 0-2-1V5a2 2 0 0 0-2-2Z"/><circle cx="12" cy="12" r="3"/></symbol><symbol id="i-help" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M9.5 9a2.6 2.6 0 0 1 5 1c0 2-2.5 2.5-2.5 4M12 17h.01"/></symbol><symbol id="i-search" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="7"/><path d="m16 16 5 5"/></symbol><symbol id="i-bell" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 8a6 6 0 0 0-12 0c0 7-3 7-3 9h18c0-2-3-2-3-9M10 21h4"/></symbol><symbol id="i-user" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="7" r="4"/><path d="M4 21v-3a8 8 0 0 1 16 0v3"/></symbol><symbol id="i-chevron-down" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9 6 6 6-6"/></symbol><symbol id="i-arrow-right" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m9 18 6-6-6-6"/></symbol><symbol id="i-upload" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 16V3m-5 5 5-5 5 5"/><path d="M4 15v4a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-4"/></symbol><symbol id="i-upload-cloud" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M7 19H6a4 4 0 0 1-.6-7.96A7 7 0 0 1 19 10a4.5 4.5 0 0 1 .5 9H17"/><path d="M12 21V12m-4 4 4-4 4 4"/></symbol><symbol id="i-file" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 2h8l5 5v15H6a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2z"/><path d="M14 2v6h5"/></symbol><symbol id="i-check-circle" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="m7 12 3 3 7-7"/></symbol><symbol id="i-menu" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 6h16M4 12h16M4 18h16"/></symbol><symbol id="i-x" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6 6 18M6 6l12 12"/></symbol><symbol id="i-sun" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="4"></circle><path d="M12 2v2"></path><path d="M12 20v2"></path><path d="m4.93 4.93 1.41 1.41"></path><path d="m17.66 17.66 1.41 1.41"></path><path d="M2 12h2"></path><path d="M20 12h2"></path><path d="m6.34 17.66-1.41 1.41"></path><path d="m19.07 4.93-1.41 1.41"></path></symbol><symbol id="i-moon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3a6 6 0 0 0 9 9 9 9 0 1 1-9-9z"></path></symbol></defs></svg>
@@ -3103,7 +3123,7 @@ body[data-theme="dark"] #bellMessage .tc-bell-chevron {color:#bac9e1!important;o
 <div class="tc-history-tools"><button type="button" id="historySearchToggle" class="tc-history-search-toggle" aria-controls="historySearchPanel" aria-expanded="false" onclick="toggleHistorySearch()"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 6h16M4 12h16M4 18h16"/><circle cx="9" cy="6" r="2.5" fill="var(--tc-history-button-bg,#fff)"/><circle cx="16" cy="12" r="2.5" fill="var(--tc-history-button-bg,#fff)"/><circle cx="10" cy="18" r="2.5" fill="var(--tc-history-button-bg,#fff)"/></svg><span>Search &amp; Filters</span><span class="tc-history-search-active" id="historySearchActive" hidden></span></button></div></div>
 <div id="historySearchPanel" class="tc-history-search-panel" hidden><div class="tc-history-search-field"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="m16 16 5 5"/></svg><input id="historySearchInput" type="search" placeholder="Type a title, topic or question" autocomplete="off" oninput="searchReviewHistory(this.value)" aria-label="Search review history by title, topic or question"><button type="button" id="historySearchClear" onclick="clearHistorySearchQuery()">Clear</button></div></div>
 <div class="content-stack" id="historyContent"></div></section>
-<section id="settings"><div class="page-heading"><div class="page-heading-icon"><svg class="icon" aria-hidden="true"><use href="#i-settings"></use></svg></div><div><h1>Settings</h1><p>Review notifications, calendar schedules, and local data.</p></div></div><div class="panel settings-panel"><div class="setting-block"><h3>Review Notifications</h3><p>Receive an alert when approved flashcards are due, while this website is open.</p><div class="reminder-actions"><button id="enableNotifications">Enable Notifications</button></div><small id="notificationStatus"></small></div><div class="setting-block"><h3>Google Calendar</h3><p>Add each scheduled review date to Google Calendar, or download all dates as a calendar file.</p><div class="reminder-actions"><button id="calendarNext">Add Review Dates to Google Calendar</button></div></div><div class="setting-block"><h3>Manage Data</h3><div class="reminder-actions"><button type="button" id="tcManageDataOpen" class="tc-history-clear-btn" aria-haspopup="dialog"><svg class="icon" aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18M8 6V4h8v2m3 0-1 14H6L5 6m5 4v6m4-6v6"/></svg>Manage Data</button></div></div></div></section>
+<section id="settings"><div class="page-heading"><div class="page-heading-icon"><svg class="icon" aria-hidden="true"><use href="#i-settings"></use></svg></div><div><h1>Settings</h1><p>Review notifications, calendar schedules, and local data.</p></div></div><div class="panel settings-panel"><div class="setting-block"><div class="tc-setting-switch-row"><div class="tc-setting-switch-copy"><h3 id="tcNotificationsLabel">Review Notifications</h3><p id="tcNotificationsDescription">Get alerts when flashcards are due while this website is open.</p></div><button type="button" class="tc-setting-switch" id="enableNotifications" role="switch" aria-checked="false" aria-labelledby="tcNotificationsLabel" aria-describedby="tcNotificationsDescription notificationStatus"><span aria-hidden="true"></span></button></div><small id="notificationStatus" role="status"></small></div><div class="setting-block"><div class="tc-setting-switch-row"><div class="tc-setting-switch-copy"><h3 id="tcCalendarLabel">Google Calendar</h3><p id="tcCalendarDescription">Show review dates to add to Google Calendar.</p></div><button type="button" class="tc-setting-switch" id="calendarNext" role="switch" aria-checked="false" aria-labelledby="tcCalendarLabel" aria-describedby="tcCalendarDescription" aria-controls="tcSettingsCalendarDates"><span aria-hidden="true"></span></button></div><div id="tcSettingsCalendarDates" hidden></div></div><div class="setting-block"><h3>Data Management</h3><p>Delete generated flashcards or review history.</p><div class="reminder-actions"><button type="button" id="tcManageDataOpen" aria-haspopup="dialog"><svg class="icon" aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18M8 6V4h8v2m3 0-1 14H6L5 6m5 4v6m4-6v6"/></svg>Clear Data</button></div></div></div></section>
 <section id="help">
   <div class="page-heading">
     <div class="page-heading-icon"><svg class="icon" aria-hidden="true"><use href="#i-help"></use></svg></div>
@@ -3531,12 +3551,10 @@ function nextReviewDate(){
 }
 
 function formatDate(date){
- return date.toLocaleString(undefined,{
+ return date.toLocaleDateString(undefined,{
   year:'numeric',
   month:'short',
-  day:'numeric',
-  hour:'numeric',
-  minute:'2-digit'
+  day:'numeric'
  });
 }
 
@@ -3623,54 +3641,72 @@ $('tcCalendarClose').addEventListener('click',tcCloseCalendarSchedule);
 $('tcCalendarSchedule').addEventListener('click',e=>{if(e.target===$('tcCalendarSchedule'))tcCloseCalendarSchedule();});
 document.addEventListener('keydown',e=>{if(e.key==='Escape'&&!$('tcCalendarSchedule').hidden)tcCloseCalendarSchedule();});
 
-$('calendarNext').onclick=calendarEvent;
+// Calendar is a manual export, not a synced account. This switch reveals its date list.
+let tcSettingsCalendarOpen=false,tcSettingsCalendarSignature=null;
+function tcRenderSettingsCalendar(){
+ const button=$('calendarNext'),list=$('tcSettingsCalendarDates');
+ button.setAttribute('aria-checked',String(tcSettingsCalendarOpen));
+ list.hidden=!tcSettingsCalendarOpen;
+ if(!tcSettingsCalendarOpen)return;
+ const groups=tcCalendarGroups();
+ const signature=JSON.stringify(groups.map(g=>[g.day,g.when.getTime(),g.count]));
+ if(signature===tcSettingsCalendarSignature)return;
+ tcSettingsCalendarSignature=signature;
+ list.replaceChildren();
+ if(!groups.length){const empty=document.createElement('p');empty.textContent='No scheduled reviews yet.';list.appendChild(empty);return;}
+ groups.forEach(group=>{
+  const row=document.createElement('div');row.className='tc-calendar-date-row';
+  const label=document.createElement('div');label.className='tc-calendar-date-text';
+  const date=document.createElement('strong');date.textContent=group.when.toLocaleDateString(undefined,{weekday:'short',year:'numeric',month:'short',day:'numeric'});
+  const count=document.createElement('span');count.textContent=`${group.count} flashcard${group.count===1?'':'s'}`;
+  label.append(date,count);
+  const add=document.createElement('button');add.type='button';add.className='tc-calendar-add-date';add.textContent='Add to Google Calendar';
+  add.setAttribute('aria-label',`Add review on ${date.textContent} to Google Calendar`);
+  add.addEventListener('click',()=>window.open(tcGoogleCalendarUrl(group),'_blank','noopener,noreferrer'));
+  row.append(label,add);list.appendChild(row);
+ });
+}
+$('calendarNext').onclick=()=>{tcSettingsCalendarOpen=!tcSettingsCalendarOpen;tcRenderSettingsCalendar();};
 
 function notificationsSupported(){
  return 'Notification' in window&&window.isSecureContext;
 }
 
-function updateNotificationStatus(){
- const el=$('notificationStatus');
- const button=$('enableNotifications');
-
- if(!notificationsSupported()){
-  el.textContent='Browser notifications require HTTPS or localhost and a supported browser.';
-  button.disabled=true;
-  return;
- }
-
- if(Notification.permission==='granted'){
-  el.textContent='Notifications enabled. Reminders appear while this website is open.';
-  button.disabled=true;
- }else if(Notification.permission==='denied'){
-  el.textContent='Notifications blocked. Allow them in your browser settings.';
-  button.disabled=true;
- }else{
-  el.textContent='Enable notifications to receive due-review alerts while the website is open.';
-  button.disabled=false;
- }
+const tcNotificationPreferenceKey=key+'browserNotificationsEnabled';
+let tcNotificationRequestPending=false;
+function tcBrowserNotificationsEnabled(){
+ return notificationsSupported()&&Notification.permission==='granted'&&tcStore.getItem(tcNotificationPreferenceKey)!=='off';
 }
-
+function updateNotificationStatus(){
+ const el=$('notificationStatus'),button=$('enableNotifications');
+ button.setAttribute('aria-checked',String(tcBrowserNotificationsEnabled()));
+ button.disabled=tcNotificationRequestPending||!notificationsSupported()||(notificationsSupported()&&Notification.permission==='denied');
+ if(!notificationsSupported())el.textContent='Browser notifications require HTTPS and a supported browser.';
+ else if(Notification.permission==='denied')el.textContent='Notifications blocked. Allow them in your browser settings.';
+ else el.textContent='';
+}
 $('enableNotifications').onclick=async()=>{
- if(!notificationsSupported())return;
-
- try{
-  const permission=await Notification.requestPermission();
-  updateNotificationStatus();
-
-  if(permission==='granted'){
-   checkReviewNotification();
-  }
- }catch(err){
-  $('notificationStatus').textContent=
-   'Could not enable notifications: '+err.message;
+ if(!notificationsSupported()||tcNotificationRequestPending)return;
+ if(tcBrowserNotificationsEnabled()){
+  tcStore.setItem(tcNotificationPreferenceKey,'off');updateNotificationStatus();return;
  }
+ if(Notification.permission==='denied'){updateNotificationStatus();return;}
+ tcNotificationRequestPending=true;updateNotificationStatus();
+ let errorMessage='';
+ try{
+  const permission=Notification.permission==='granted'?'granted':await Notification.requestPermission();
+  tcStore.setItem(tcNotificationPreferenceKey,permission==='granted'?'on':'off');
+ }catch(err){errorMessage='Could not enable notifications: '+err.message;}
+ finally{tcNotificationRequestPending=false;updateNotificationStatus();}
+ if(errorMessage)$('notificationStatus').textContent=errorMessage;
+ if(tcBrowserNotificationsEnabled())checkReviewNotification();
 };
+window.addEventListener('focus',updateNotificationStatus);
 
 function checkReviewNotification(){
  // Browser notifications are available while the website is open.
  // Each approved card keeps its own due date (1 / 3 / 7 days).
- if(!notificationsSupported()||Notification.permission!=='granted')return;
+ if(!tcBrowserNotificationsEnabled())return;
  const groups=tcCalendarGroups();
  const today=new Date();today.setHours(0,0,0,0);
  for(const group of groups){
@@ -3703,7 +3739,7 @@ function drawReminders(){
  }else{
   content.innerHTML=`<div class="reminder empty"><div class="reminder-copy"><b>No flashcards due for review</b></div><button type="button" onclick="show('sets')">View Sets</button></div>`;
  }
- $('calendarNext').disabled=!next;
+ tcRenderSettingsCalendar();
  tcRenderBellSchedule();
  updateNotificationStatus();
 }
@@ -4123,7 +4159,7 @@ function tcBgNotifyCompleted(job,total){
  tcBgReadyToastTimer=setTimeout(()=>{$('tcGeneratedCompleteToast').hidden=true;},11000);
  // Browser notification requires the student to enable notifications in Settings.
  // If the tab was closed, the server job is checked on next visit and this is delivered then.
- if('Notification' in window&&window.isSecureContext&&Notification.permission==='granted'){
+ if(tcBrowserNotificationsEnabled()){
   try{
    const notification=new Notification('TraceCard AI • Flashcards Ready',{
     body:`${notice.total} flashcards generated successfully. Open Flashcard Sets to approve them.`,
@@ -4902,10 +4938,17 @@ function tcProofRecord(card,answered,rating){
  // The normal review save persists this outbox before network synchronization.
 }
 function tcProofMarkup(){return '<div id="tcResearchCompletion" class="box tc-research-completion" hidden aria-live="polite"></div>';}
+function tcCompletedReview(){
+ return !!(session&&Array.isArray(session.ids)&&session.ids.length>0&&
+  session.index>=session.ids.length&&session.ids.every(id=>typeof session.results?.[id]==='boolean'));
+}
 function tcProofUpdatePanel(){
  const panel=$('tcResearchCompletion');if(!panel)return;
- const proof=session?.tcProof||tcProofPending,last=tcProofLast();
- const code=proof ? (proof.claimed?proof.code:'') : last?.code;
+ // Only the current, fully answered review may display its own completion panel.
+ if(!tcCompletedReview()){panel.hidden=true;panel.innerHTML='';return;}
+ const proof=session.tcProof;
+ if(proof&&proof.events.length!==proof.indices.length){panel.hidden=true;panel.innerHTML='';return;}
+ const code=proof?.claimed?proof.code:'';
  panel.hidden=false;
  if(code){
   panel.innerHTML=`<h3>Activity Completed!</h3><p>Your participation has been verified. Copy this code and enter it in the research survey.</p><div class="tc-research-code">${safe(code)}</div><button type="button" id="tcCopyCompletionCode">Copy Completion Code</button><p id="tcCopyCompletionStatus" role="status"></p><small>Keep this code private. One code may be used for one survey entry.</small>`;
@@ -4926,7 +4969,6 @@ function tcProofUpdatePanel(){
    }catch(e){status.textContent=e?.message||'Could not claim your code. Please retry.';button.disabled=false;}
   };
  }else if(proof){
-  if(proof.events.length!==proof.indices.length){panel.innerHTML='<h3>Research participation</h3><p>Complete a full review of at least 10 approved cards in one generated set to receive a completion code.</p>';return;}
   panel.innerHTML=`<h3>Research participation</h3><p>${proof.error?safe(proof.error):'Verifying your completed review…'}</p>${proof.error?'<button type="button" id="tcRetryCompletionCode">Retry Verification</button>':''}`;
   if($('tcRetryCompletionCode'))$('tcRetryCompletionCode').onclick=()=>tcProofSync(proof,true);
  }else if(session){panel.innerHTML='<h3>Research participation</h3><p>To receive a completion code, generate a new set using the updated system, approve at least 10 cards and complete their review.</p>';}
@@ -4939,7 +4981,7 @@ function drawReview(){
   const first=due()[0];
   if(first){session={deck:first.deck,ids:due().filter(c=>c.deck===first.deck).map(c=>c.id),index:0,answers:{},results:{}};saveSessionOnly();}
  }
- if(!session){$('quiz').textContent='No approved cards due for review.';if(tcProofLast()||tcProofPending){$('quiz').insertAdjacentHTML('beforeend',tcProofMarkup());tcProofUpdatePanel();tcProofSync(tcProofPending);}return;}
+ if(!session){$('quiz').textContent='No approved cards due for review.';if(tcProofPending)tcProofSync(tcProofPending);return;}
  if(!Array.isArray(session.ids)){session=null;saveSessionOnly();$('quiz').textContent='No valid review session.';return;}
  session.answers=session.answers||{};
  session.results=session.results||{};
@@ -4962,7 +5004,7 @@ function drawReview(){
    ${animate?'<div class="tc-review-complete-animation"><span class="tc-review-complete-check" aria-hidden="true">✓</span><span>Review completed!</span></div>':''}
    <h3>Set Review Complete!</h3><p><b>${correctCount}/${session.ids.length} correct</b> · ${session.ids.length} questions reviewed.</p>
    ${next?`<p><b>Next Review:</b> ${safe(formatDate(next))}</p>`:''}
-   <div class="actions"><button onclick="show('history')">View History</button><button onclick="session=null;save();show('review')">Review Other Due Cards</button>${next?`<button onclick="calendarEvent()">Add Review Dates to Google Calendar</button>`:''}</div></div>`+tcProofMarkup();
+   <div class="actions"><button onclick="show('history')">View History</button><button onclick="session=null;save();show('review')">Review Other Due Cards</button>${next?`<button onclick="calendarEvent()">Add Review Dates to Google Calendar</button>`:''}</div></div>`+(tcCompletedReview()?tcProofMarkup():'');
   tcProofUpdatePanel();
   return;
  }
