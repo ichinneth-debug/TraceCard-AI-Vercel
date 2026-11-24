@@ -2862,6 +2862,12 @@ body[data-theme="dark"] .tc-stop-generation-confirm .tc-clear-icon{background:#4
    Error details and completion messages return as soon as generation stops. */
 html.tc-gen-active #info { display:none !important; }
 </style>
+<style id="tc-aligned-status-checks-v1">
+.tc-approval-toast .tc-toast-check{display:flex!important;align-items:center!important;justify-content:center!important;padding:0!important;box-sizing:border-box!important;line-height:1!important;flex:0 0 26px;}
+.tc-approval-toast .tc-toast-check svg{display:block;width:16px;height:16px;fill:none;stroke:currentColor;stroke-width:3;stroke-linecap:round;stroke-linejoin:round;flex:none;}
+.status-pill.approved{display:inline-flex;align-items:center;justify-content:center;gap:5px;vertical-align:middle;}
+.status-pill.approved .tc-activity-status-check{display:block;width:13px;height:13px;fill:none;stroke:currentColor;stroke-width:2.5;stroke-linecap:round;stroke-linejoin:round;flex:none;}
+</style>
 </head>
 <body data-theme="light">
 
@@ -2952,7 +2958,7 @@ html.tc-gen-active #info { display:none !important; }
 <div class="tc-history-tools"><button type="button" id="historySearchToggle" class="tc-history-search-toggle" aria-controls="historySearchPanel" aria-expanded="false" onclick="toggleHistorySearch()"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 6h16M4 12h16M4 18h16"/><circle cx="9" cy="6" r="2.5" fill="var(--tc-history-button-bg,#fff)"/><circle cx="16" cy="12" r="2.5" fill="var(--tc-history-button-bg,#fff)"/><circle cx="10" cy="18" r="2.5" fill="var(--tc-history-button-bg,#fff)"/></svg><span>Filters / Search</span><span class="tc-history-search-active" id="historySearchActive" hidden></span></button><button type="button" id="clearReviewHistory" class="tc-history-clear-btn" onclick="clearReviewHistory()"><svg class="icon" aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18M8 6V4h8v2m3 0-1 14H6L5 6m5 4v6m4-6v6"/></svg><span>Clear Review History</span></button></div></div>
 <div id="historySearchPanel" class="tc-history-search-panel" hidden><label for="historySearchInput">Find a question or answer from your Review History</label><div class="tc-history-search-field"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="m16 16 5 5"/></svg><input id="historySearchInput" type="search" placeholder="Type a question, topic, or answer..." autocomplete="off" oninput="searchReviewHistory(this.value)" aria-describedby="historySearchNote"><button type="button" id="historySearchClear" onclick="clearHistorySearchQuery()">Clear</button></div><small id="historySearchNote">Search across all approved sets, including older saved questions, correct answers, and your answers.</small></div>
 <div class="content-stack" id="historyContent"></div></section>
-<section id="settings"><div class="page-heading"><div class="page-heading-icon"><svg class="icon" aria-hidden="true"><use href="#i-settings"></use></svg></div><div><h1>Settings</h1><p>Review notifications, calendar schedules, and local data.</p></div></div><div class="panel settings-panel"><div class="setting-block"><h3>Review Notifications</h3><p>Receive an alert when approved flashcards are due, while this website is open.</p><div class="reminder-actions"><button id="enableNotifications">Enable Notifications</button></div><small id="notificationStatus"></small></div><div class="setting-block"><h3>Google Calendar</h3><p>Add each scheduled review date to Google Calendar, or download all dates as a calendar file.</p><div class="reminder-actions"><button id="calendarNext">Add Review Dates to Google Calendar</button></div></div><div class="setting-block"><h3>Your Data</h3><p>Flashcards and history are stored locally in this browser. Clear Generated Data removes active flashcards but keeps Review History, scores, and Recent Activity.</p></div></div></section>
+<section id="settings"><div class="page-heading"><div class="page-heading-icon"><svg class="icon" aria-hidden="true"><use href="#i-settings"></use></svg></div><div><h1>Settings</h1><p>Review notifications, calendar schedules, and local data.</p></div></div><div class="panel settings-panel"><div class="setting-block"><h3>Review Notifications</h3><p>Receive an alert when approved flashcards are due, while this website is open.</p><div class="reminder-actions"><button id="enableNotifications">Enable Notifications</button></div><small id="notificationStatus"></small></div><div class="setting-block"><h3>Google Calendar</h3><p>Add each scheduled review date to Google Calendar, or download all dates as a calendar file.</p><div class="reminder-actions"><button id="calendarNext">Add Review Dates to Google Calendar</button></div></div><div class="setting-block"><h3>Your Data</h3><p>Flashcards and history are stored locally in this browser. Clear Generated Data permanently removes generated flashcards, previous sets, Recent Activity, Review History, scores, and locally saved source PDFs. Your appearance settings are kept.</p></div></div></section>
 <section id="help">
   <div class="page-heading">
     <div class="page-heading-icon"><svg class="icon" aria-hidden="true"><use href="#i-help"></use></svg></div>
@@ -3572,6 +3578,19 @@ async function tcSaveOriginalPdf(file){
    tr.onabort=()=>reject(tr.error||Error('Could not save PDF'));
   });
  }finally{db.close();}
+}
+async function tcClearStoredOriginalPdfs(){
+ const db=await tcOpenPdfDB();
+ try{
+  await new Promise((resolve,reject)=>{
+   const transaction=db.transaction(tcPdfDBStore,'readwrite');
+   transaction.objectStore(tcPdfDBStore).clear();
+   transaction.oncomplete=()=>resolve();
+   transaction.onerror=()=>reject(transaction.error||Error('Could not remove stored PDFs'));
+   transaction.onabort=()=>reject(transaction.error||Error('Could not remove stored PDFs'));
+  });
+ }finally{db.close();}
+ tcSourceDocCache.clear();
 }
 async function tcGetOriginalPdf(name){
  const db=await tcOpenPdfDB();
@@ -4311,45 +4330,65 @@ $('cancelGeneration').onclick=async()=>{
  }
 };
 
-// CLEAR GENERATED DATA ONLY
+// CLEAR GENERATED DATA, PREVIOUS SETS, ACTIVITY, AND REVIEW HISTORY.
+// User-requested full reset, not the old keep-history/archive behavior.
 $('clear').onclick=async()=>{
  if(tcLegacyGenerating||tcBgStarting||tcBgCancelling){alert('Cancel the active generation first.');return;}
- if(tcBgGet()&&!['failed','cancelled'].includes(tcBgGet().lastStatus||'')){alert('Cancel the active background generation before clearing generated data.');return;}
- if(!await tcConfirmClear({
-  title:'Clear Generated Data?',
-  description:'This removes generated flashcards and unfinished generation progress from this device. You cannot undo this action.',
-  kept:'Your Review History, scores, and Recent Activity will be kept.',
-  confirmLabel:'Clear Generated Data'
- }))return;
- // Recheck activity, as it may have changed while the modal was open.
- if(tcLegacyGenerating||tcBgStarting||tcBgCancelling||Boolean(tcBgGet()&&!['failed','cancelled'].includes(tcBgGet().lastStatus||'')))return;
- const byDeck=new Map(activityArchive.map(r=>[r.deck,r]));
- for(const deck of [...new Set(cards.map(c=>c.deck))]){
-  const list=cards.filter(c=>c.deck===deck);
-  if(!list.length)continue;
-  const stamp=list[0]?.id?parseInt(String(list[0].id).slice(0,-6),36):NaN;
-  const approved=list.some(c=>c.status==='approved');
-  const pending=list.some(c=>c.status==='pending');
-  byDeck.set(deck,{deck,name:list[0].pdf||'PDF lecture',set:list[0].name||'Flashcard set',amount:list.length,state:approved?'Approved':pending?'Generated':'Rejected',time:Number.isFinite(stamp)?stamp:Date.now()});
+ if(tcBgGet()&&!['failed','cancelled'].includes(tcBgGet().lastStatus||'')){
+  alert('Cancel the active background generation before clearing all data.');return;
  }
- activityArchive=[...byDeck.values()];
- const existing=new Map(archivedCards.map(c=>[c.id,c]));
- cards.filter(c=>c.status==='approved').forEach(c=>existing.set(c.id,{...c}));
- archivedCards=[...existing.values()];
+ if(!await tcConfirmClear({
+  title:'Clear Generated Data & History?',
+  description:'This permanently removes ALL generated and approved flashcards, Recent Activity (including older PDF sets), Review History, answers, scores, review schedules, and saved source PDFs from this browser. You cannot undo this action.',
+  kept:'Your TraceCard AI appearance and settings will be kept. Original PDF files stored outside this website will not be deleted.',
+  confirmLabel:'Yes, Clear Everything',
+  cancelLabel:'Keep My Data'
+ }))return;
+ // A job may start while the confirmation dialog is open.
+ if(tcLegacyGenerating||tcBgStarting||tcBgCancelling||Boolean(tcBgGet()&&!['failed','cancelled'].includes(tcBgGet().lastStatus||'')))return;
+ let pdfDeleteError=null;
+ try{await tcClearStoredOriginalPdfs();}
+ catch(error){pdfDeleteError=error;console.warn('Could not delete saved source PDFs:',error);tcSourceDocCache.clear();}
+ cards=[];
+ logs=[];
+ archivedCards=[];
+ activityArchive=[];
+ session=null;
+ pages=[];
+ doc=null;
+ fileName='';
+ opened='';historyCard='';historyDeck='';historyFilter='all';historySearchQuery='';historySearchOrigin=false;
+ const historyInput=$('historySearchInput');if(historyInput)historyInput.value='';
+ const pdfInput=$('pdf');if(pdfInput)pdfInput.value='';
  tcStore.removeItem(draftKey);
+ // Clear old completed / cancelled job records, ready notices and previously-shown
+ // date reminders, but never tamper with a currently-running server job.
+ try{tcBgStopPolling();tcBgRemember(null);}catch(error){console.warn('Could not clear old generation job reference:',error);}
+ try{tcStore.removeItem(tcBgReadyKey);}catch(error){console.warn('Could not clear completion notice:',error);}
+ try{
+  if(typeof tcStore.key==='function'){
+   const prefix=key+'reviewNotificationByDate:';
+   const toRemove=[];
+   for(let i=0;i<tcStore.length;i++){
+    const entry=tcStore.key(i);
+    if(entry&&entry.startsWith(prefix))toRemove.push(entry);
+   }
+   toRemove.forEach(entry=>tcStore.removeItem(entry));
+  }
+ }catch(error){console.warn('Could not reset notification flags:',error);}
  $('tcGenProgress').hidden=true;
- $('make').textContent='Generate Flashcards';
- cards=[];session=null;opened='';historyCard='';historyDeck='';
- // Clear outdated completion UI so a past generation cannot appear as ready.
- try{tcStore.removeItem(tcBgReadyKey);}catch(_){}
  $('tcGeneratedCompleteToast').hidden=true;
  $('tcBgStatus').hidden=true;
- $('info').textContent=doc
-  ?'Generated flashcards cleared. Your PDF is still selected for new generation.'
-  :'Generated flashcards cleared. Choose a PDF to start again.';
+ $('make').textContent='Generate Flashcards';
+ $('make').disabled=true;
+ $('info').textContent='All generated data and history cleared. Choose a PDF to start again.';
  save();
  tcBgRefreshReadyBell();
- tcShowApprovalToast('Generated flashcards cleared. Review History, scores, and Recent Activity were kept.');
+ tcUpdateCancelButton();
+ const message=pdfDeleteError
+  ?'Flashcards, History, scores and Recent Activity cleared. Saved PDF storage could not be cleared on this browser.'
+  :'Flashcards, Recent Activity, Review History, scores and saved PDFs cleared.';
+ tcShowApprovalToast(message);
 };
 
 // SET MANAGEMENT
@@ -5147,7 +5186,7 @@ function renderRecentActivity(){
  rows.sort((a,b)=>b.time-a.time);
  if(!rows.length){$('recentActivity').innerHTML='<div class="empty-activity">Your generated flashcard sets will appear here.</div>';return;}
  const relative=(t)=>{if(!t)return 'Recently';const mins=Math.max(0,Math.floor((Date.now()-t)/60000));return mins<1?'Just now':mins<60?mins+' min ago':mins<1440?Math.floor(mins/60)+' hr ago':Math.floor(mins/1440)+' days ago';};
- $('recentActivity').innerHTML=rows.slice(0,3).map(r=>`<div class="activity-row"><div class="mini-pdf"><svg class="icon" aria-hidden="true"><use href="#i-file"></use></svg></div><div class="activity-desc"><b title="${safe(r.name)}">${safe(r.name)}</b><span>${safe(r.set)} · ${r.amount} cards</span></div><span class="status-pill ${r.state.toLowerCase()}">${r.state==='Approved'?'✓ ':r.state==='Generated'?'✦ ':''}${r.state}</span><span class="activity-time">${relative(r.time)}</span></div>`).join('');
+ $('recentActivity').innerHTML=rows.slice(0,3).map(r=>`<div class="activity-row"><div class="mini-pdf"><svg class="icon" aria-hidden="true"><use href="#i-file"></use></svg></div><div class="activity-desc"><b title="${safe(r.name)}">${safe(r.name)}</b><span>${safe(r.set)} · ${r.amount} cards</span></div><span class="status-pill ${r.state.toLowerCase()}">${r.state==='Approved'?'<svg class="tc-activity-status-check" viewBox="0 0 20 20" aria-hidden="true"><path d="M4 10l4 4 8-8"/></svg>':r.state==='Generated'?'✦ ':''}${r.state}</span><span class="activity-time">${relative(r.time)}</span></div>`).join('');
 }
 
 function updateSearch(){
@@ -5334,7 +5373,7 @@ document.querySelectorAll('.tc-header-icon[data-page]').forEach(button=>{
 })();
 
 </script>
-<div id="tcApprovalToast" class="tc-approval-toast" role="status" aria-live="polite" hidden><span class="tc-toast-check" aria-hidden="true">✓</span><span id="tcApprovalToastText">Flashcards approved</span></div>
+<div id="tcApprovalToast" class="tc-approval-toast" role="status" aria-live="polite" hidden><span class="tc-toast-check" aria-hidden="true"><svg viewBox="0 0 24 24" focusable="false"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg></span><span id="tcApprovalToastText">Flashcards approved</span></div>
 
 
 <script id="tc-getting-started-slideshow-script-v2">
