@@ -3408,6 +3408,10 @@ const tcDeletedDeckKey=key+'selectively_deleted_decks_v1';
 function tcDeletedDecks(){try{return new Set(JSON.parse(tcStore.getItem(tcDeletedDeckKey)||'[]'));}catch{return new Set();}}
 
 let currentPage='home',previousPages=[];let tcUtilityReturnPage='home';
+// Display date-only titles, without changing stored batch names or identifiers.
+function dateOnlySetLabel(label){
+ return String(label||'Flashcard set').replace(/(?:,?\s+)\d{1,2}:\d{2}(?::\d{2})?(?:\s*[AP]\.?M\.?)?\s*$/i,'').trim();
+}
 const cardType=c=>['identification','enumeration','fillblank'].includes(c?.type)?c.type:'mcq';
 const normalizeAnswer=v=>clean(v).toLocaleLowerCase().replace(/[^\p{L}\p{N} ]/gu,'').replace(/\s+/g,' ');
 const answerParts=v=>String(v||'').split(/[,;\n]+/).map(normalizeAnswer).filter(Boolean);
@@ -3415,18 +3419,71 @@ const answerParts=v=>String(v||'').split(/[,;\n]+/).map(normalizeAnswer).filter(
 // Fair, deterministic typed-answer checking. Cosmetic variations are OK; scientific
 // numbers and signs stay significant. A redundant category noun may be omitted
 // only when the question itself explicitly identifies that category.
-function tcAnswerCompact(value){
- return String(value??'').normalize('NFKC').toLocaleLowerCase()
-  .replace(/[\u2010-\u2015\u2212]/g,'-')
-  .replace(/\bmillivolts?\b/g,'mv')
-  .replace(/[^\p{L}\p{N}]/gu,'');
+const tcNumberSmall=Object.freeze({zero:0,one:1,two:2,three:3,four:4,five:5,six:6,seven:7,eight:8,nine:9,ten:10,eleven:11,twelve:12,thirteen:13,fourteen:14,fifteen:15,sixteen:16,seventeen:17,eighteen:18,nineteen:19,twenty:20,thirty:30,forty:40,fifty:50,sixty:60,seventy:70,eighty:80,ninety:90});
+function tcAnswerNumberWords(value){
+ // Parse ordinary English numbers, including compound numbers and decimals.
+ // Do not erase any units, signs, or nonnumeric words.
+ const word=Object.keys(tcNumberSmall).join('|');
+ const under100=`(?:${word})(?:[ -](?:one|two|three|four|five|six|seven|eight|nine))?`;
+ const under1000=`(?:(?:one|two|three|four|five|six|seven|eight|nine) hundred(?: (?:and )?${under100})?|${under100})`;
+ const pattern=new RegExp(`\\b(?:(?:minus|negative|plus|positive) )?(?:${under1000} thousand(?: (?:and )?${under1000})?|${under1000})(?: point(?: (?:zero|one|two|three|four|five|six|seven|eight|nine))+)?\\b`,'g');
+ function parseGroup(text){
+  const tokens=text.replace(/\band\b/g,'').trim().split(/[ -]+/).filter(Boolean);
+  let n=0;
+  if(tokens[1]==='hundred'&&tcNumberSmall[tokens[0]]>=1&&tcNumberSmall[tokens[0]]<=9){n=tcNumberSmall[tokens[0]]*100;tokens.splice(0,2);}
+  if(!tokens.length)return n;
+  if(tokens.length===1&&Object.hasOwn(tcNumberSmall,tokens[0]))return n+tcNumberSmall[tokens[0]];
+  if(tokens.length===2&&tcNumberSmall[tokens[0]]>=20&&tcNumberSmall[tokens[0]]%10===0&&tcNumberSmall[tokens[1]]>=1&&tcNumberSmall[tokens[1]]<=9)return n+tcNumberSmall[tokens[0]]+tcNumberSmall[tokens[1]];
+  return null;
+ }
+ return value.replace(pattern,original=>{
+  let phrase=original,sign='';
+  phrase=phrase.replace(/^(minus|negative|plus|positive) /,(_,w)=>{sign=/minus|negative/.test(w)?'-':'+';return '';});
+  const parts=phrase.split(' point '),groups=parts[0].split(' thousand');
+  let n=parseGroup(groups[0]);if(n===null)return original;
+  if(groups.length===2){const rest=groups[1].replace(/^ (?:and )?/,'');const lower=rest?parseGroup(rest):0;if(lower===null)return original;n=n*1000+lower;}
+  const decimals=parts[1]?'.'+parts[1].split(' ').map(w=>tcNumberSmall[w]).join(''):'';
+  return sign+String(n)+decimals;
+ });
 }
-function tcAnswerNumbers(value){
- const text=String(value??'').normalize('NFKC').toLocaleLowerCase().replace(/[\u2010-\u2015\u2212]/g,'-');
- const numbers=[];
- const rx=/(^|[^\p{L}\p{N}])([+\-]?)\s*(\d+(?:\.\d+)?)/gu;
- for(const match of text.matchAll(rx))numbers.push((match[2]==='-'?'-':'')+match[3]);
- return numbers;
+function tcAnswerCompact(value){
+ let text=String(value??'').normalize('NFKC').toLocaleLowerCase().trim()
+  .replace(/[\u2010-\u2015\u2212]/g,'-').replace(/[’‘]/g,"'")
+  .replace(/\s+/g,' ');
+ text=tcAnswerNumberWords(text)
+  .replace(/\bmillivolts?\b/g,'mv')
+  .replace(/\bdegrees?\s+(celsius|fahrenheit)\b/g,(_,unit)=>unit==='celsius'?'°c':'°f')
+  .replace(/\bdegrees?\s+([cf])\b/g,'°$1')
+  .replace(/\b(\d+(?:\.\d+)?)\s*(celsius|fahrenheit)\b/g,(_,n,unit)=>n+(unit==='celsius'?'°c':'°f'))
+  .replace(/\s*°\s*([cf])\b/g,'°$1')
+  .replace(/\b(\d+(?:\.\d+)?)\s*mv\b/g,'$1 mv')
+  .replace(/\b(?:[a-z]\.){2,}[a-z]?\.?/g,m=>m.replace(/\./g,''))
+  .replace(/(?<=\p{L})-(?=\p{L})/gu,' ')
+  .replace(/(?<=\p{L}),\s*(?=\p{L})/gu,' ')
+  .replace(/[,;.!?]+$/,'').replace(/\s+/g,' ').trim();
+ return text;
+}
+const tcReviewKnownAcronyms=Object.freeze({
+ cpu:'central processing unit',ram:'random access memory',rom:'read only memory',
+ fifo:'first in first out',lifo:'last in first out',
+ gpu:'graphics processing unit',usb:'universal serial bus',
+ ai:'artificial intelligence',html:'hypertext markup language',
+ http:'hypertext transfer protocol',https:'hypertext transfer protocol secure',
+ pdf:'portable document format',os:'operating system',
+ dna:'deoxyribonucleic acid',rna:'ribonucleic acid',
+ atp:'adenosine triphosphate',
+});
+function tcReviewAcronymMatch(actual,target,question){
+ if(/\b(?:full form|full name|full term|complete name|complete term|exact name|exact term|exact wording|spell out|write in full|stand for|stands for|expand)\b/i.test(question))return false;
+ const a=tcAnswerCompact(actual),b=tcAnswerCompact(target);
+ const pair=(short,long,rawShort)=>{
+  if(!/^[a-z]{2,12}$/.test(short)||!/^\p{L}+(?: \p{L}+)+$/u.test(long))return false;
+  if(Object.hasOwn(tcReviewKnownAcronyms,short))return tcReviewKnownAcronyms[short]===long;
+  // Unknown acronyms are only allowed when the question itself supplies the acronym.
+  const explicit=(String(question).match(/\b[A-Z]{2,12}\b/g)||[]).some(x=>x.toLowerCase()===short);
+  return explicit&&long.split(' ').map(w=>w[0]).join('')===short;
+ };
+ return pair(a,b,actual)||pair(b,a,target);
 }
 function tcReviewCategoryBase(word){
  let term=String(word??'').toLocaleLowerCase();
@@ -3468,7 +3525,7 @@ const tcReviewProtectedNouns=new Set([
 ]);
 function tcReviewPluralOf(singular,plural){
  if(!/^[a-z]{3,}$/.test(singular)||!(/^[a-z]+$/).test(plural))return false;
- if(tcReviewIrregularForms.some(pair=>pair[0]===singular&&pair[1]===plural))return true;
+ if(tcReviewIrregularForms.some(pair=>pair[0]===singular&&pair[1]===plural))return ['child','person','tooth','foot','mouse','leaf','life','knife'].includes(singular);
  // A regular plural must be derived from the whole word, not an arbitrary stem.
  if(/[^aeiou]y$/.test(singular))return plural===singular.slice(0,-1)+'ies';
  if(/(?:s|x|z|ch|sh)$/.test(singular)){
@@ -3504,14 +3561,14 @@ function tcReviewTextVariant(actual,target,question){
  if(!aw.length||aw.length!==bw.length)return '';
  const q=String(question??'');
  // A grammar question asking for the singular/plural form needs that exact form.
- const allowInflection=!/\b(?:singular|plural|inflect(?:ion|ed)?|grammatical number)\b/i.test(q);
+ const allowInflection=!/\b(?:singular|plural|inflect(?:ion|ed)?|grammatical number|exact term|exact name|scientific name|technical term|spell)\b/i.test(q);
  let plural=false,spelling=false,typos=0;
  for(let i=0;i<aw.length;i++){
   const kind=tcReviewWordVariant(aw[i],bw[i],allowInflection);
   if(!kind)return '';
   if(kind==='plural')plural=true;
   if(kind==='spelling')spelling=true;
-  if(kind==='typo'&&++typos>1)return '';
+  if(kind==='typo'&&(!allowInflection||++typos>1))return '';
  }
  if(typos)return 'Minor typing variation accepted.';
  if(plural)return 'Singular/plural variation accepted.';
@@ -3521,14 +3578,19 @@ function tcReviewTextVariant(actual,target,question){
 function tcEquivalentReviewAnswer(given,expected,question=''){
  const actual=String(given??'').trim(),target=String(expected??'').trim();
  if(!actual||!target)return {correct:false,note:''};
- const actualNumbers=tcAnswerNumbers(actual),expectedNumbers=tcAnswerNumbers(target);
- // Numeric values, decimal places and negative signs are never optional.
- if(actualNumbers.join('|')!==expectedNumbers.join('|'))return {correct:false,note:''};
  const actualKey=tcAnswerCompact(actual),expectedKey=tcAnswerCompact(target);
+ const q=String(question??'');
+ const exactTerm=/\b(?:full form|full name|full term|complete name|complete term|exact name|exact term|exact wording|spell out|write in full|stand for|stands for|expand)\b/i.test(q);
  if(actualKey&&actualKey===expectedKey){
   return {correct:true,note:actual.toLocaleLowerCase()===target.toLocaleLowerCase()?'':'Equivalent formatting accepted.'};
  }
- const variation=tcReviewTextVariant(actual,target,question);
+ // Numeric mismatches must not reach a shorter-answer or typo rule.
+ const numericTokens=value=>value.match(/[+\-]?\d+(?:\.\d+)?/g)||[];
+ if(JSON.stringify(numericTokens(actualKey))!==JSON.stringify(numericTokens(expectedKey)))return {correct:false,note:''};
+ if(!exactTerm&&actualKey&&expectedKey&&actualKey.replace(/^(?:the|an|a) /,'')===expectedKey.replace(/^(?:the|an|a) /,''))return {correct:true,note:'Equivalent wording accepted.'};
+ if(tcReviewAcronymMatch(actual,target,q))return {correct:true,note:'Equivalent abbreviation accepted.'};
+ if(!exactTerm&&/^(?:singular|plural)(?: form)?$/.test(actualKey)&&/^(?:singular|plural)(?: form)?$/.test(expectedKey)&&actualKey.replace(/ form$/,'')===expectedKey.replace(/ form$/,''))return {correct:true,note:'Equivalent grammatical form accepted.'};
+ const variation=exactTerm?'':tcReviewTextVariant(actual,target,question);
  if(variation)return {correct:true,note:variation};
  // One final category noun can be redundant when the question asks for that
  // category. E.g. 'primary' for 'primary colors' in a question about colors;
@@ -4973,14 +5035,14 @@ function drawSets(){
 
    if(!active.length){
     return `<div class="box">
-     <b>${safe(list[0].name||'Set '+(i+1))} - Rejected</b>
+     <b>${safe(dateOnlySetLabel(list[0].name||'Set '+(i+1)))} - Rejected</b>
      <p><small>${safe(list[0].pdf)} | ${rejected} rejected</small></p>
      <button onclick="restoreSet('${d}')">Restore Set</button>
     </div>`;
    }
 
    return `<div class="box">
-    <b>${safe(list[0].name||'Set '+(i+1))}</b> (${active.length} cards)
+    <b>${safe(dateOnlySetLabel(list[0].name||'Set '+(i+1)))}</b> (${active.length} cards)
     <p><small>${safe(list[0].pdf)}${rejected?' | '+rejected+' rejected':''}</small></p>
     <div class="actions">
      <button onclick="opened='${d}';drawSets()">Edit</button>
@@ -5174,7 +5236,7 @@ function tcDrawRatedReview(entry,entries){
  const question=result.q??card.q;
  const correctAnswer=result.correctAnswer??card.a;
  $('quiz').innerHTML=reviewProgressMarkup()+tcReviewNavMarkup(position>0,nextLabel)+`<div class="box tc-review-card tc-reviewed-question">
- <p><small><b>${safe(card.name)}</b> | Question ${index+1}/${session.ids.length}</small></p>
+ <p><small><b>${safe(dateOnlySetLabel(card.name))}</b> | Question ${index+1}/${session.ids.length}</small></p>
  <h3>${safe(question)}</h3>
  <div class="tc-review-flip-heading"><span class="tc-review-result-pill ${result.correct?'':'is-wrong'}">${result.correct?'✓ Correct!':'✕ Incorrect'}</span></div>
  <div class="tc-review-answer-panel your-answer"><strong>Your answer</strong><p>${safe(shownAnswer)}</p></div>
@@ -5230,7 +5292,7 @@ function drawReview(){
   :type==='enumeration'
    ?`<div class="tc-enum-group" role="group" aria-label="Enumeration answers"><div class="tc-enum-grid">${Array.from({length:enumCount},(_,i)=>`<label class="tc-enum-field"><input class="tc-enum-input" type="text" autocomplete="off" enterkeyhint="${i===enumCount-1?'done':'next'}" placeholder="Answer ${i+1}" aria-label="Answer ${i+1} of ${enumCount}" value="${safe(savedEnum[i]||'')}"></label>`).join('')}</div></div>`
    :`<label class="tc-answer-label">${type==='fillblank'?'Fill in the missing word or phrase':'Type your answer'}<input id="typedAnswer" type="text" autocomplete="off" placeholder="Enter your answer" value="${safe(saved?.answer||'')}"></label>`;
- const answerBack=`<div class="tc-review-flip-heading"><span id="tcReviewResultPill" class="tc-review-result-pill" role="status"></span><small>${safe(c.name)} · Question ${session.index+1}/${session.ids.length}</small></div>
+ const answerBack=`<div class="tc-review-flip-heading"><span id="tcReviewResultPill" class="tc-review-result-pill" role="status"></span><small>${safe(dateOnlySetLabel(c.name))} · Question ${session.index+1}/${session.ids.length}</small></div>
   <h3>Answer revealed</h3>
   <div class="tc-review-answer-panel your-answer"><strong>Your answer</strong><p id="tcReviewYourAnswer"></p></div>
   <div class="tc-review-answer-panel"><strong>Correct answer</strong><p>${safe(c.a)}</p></div>
@@ -5239,7 +5301,7 @@ function drawReview(){
   <p class="tc-review-recall">Rate your recall to continue:</p>
   <div class="actions">${[['Difficult',1],['Partially Remembered',3],['Remembered',7]].map(([r,d])=>`<button type="button" class="tc-review-rate" data-rating="${r}" data-days="${d}">${r}</button>`).join('')}</div>`;
  $('quiz').innerHTML=reviewProgressMarkup()+tcReviewNavMarkup(ratedEntries.length>0)+`<div class="box tc-review-card"><div class="tc-review-flip-stage"><div id="tcReviewFlip" class="tc-review-flip-inner">
-  <div class="tc-review-face tc-review-face-front" aria-hidden="false"><p><small><b>${safe(c.name)}</b> | Question ${session.index+1}/${session.ids.length}</small></p><h3>${safe(c.q)}</h3>${fields}<button type="button" id="check">Check Answer</button>${type==='enumeration'?'':'<p class="tc-review-keyboard-hint">Press Enter to check your answer.</p>'}</div>
+  <div class="tc-review-face tc-review-face-front" aria-hidden="false"><p><small><b>${safe(dateOnlySetLabel(c.name))}</b> | Question ${session.index+1}/${session.ids.length}</small></p><h3>${safe(c.q)}</h3>${fields}<button type="button" id="check">Check Answer</button>${type==='enumeration'?'':'<p class="tc-review-keyboard-hint">Press Enter to check your answer.</p>'}</div>
   <div class="tc-review-face tc-review-face-back" aria-hidden="true" inert>${answerBack}</div>
  </div></div></div>`;
  const flip=document.getElementById('tcReviewFlip'),check=document.getElementById('check');
@@ -5481,7 +5543,7 @@ function drawHistoryGlobalSearch(historyCards){
    const when=result?.date&&!Number.isNaN(new Date(result.date).getTime())?new Date(result.date).toLocaleDateString():'';
    const status=result?(result.correct===true?'Correct':result.correct===false?'Incorrect':'In progress'):'Not reviewed';
    return `<button type="button" class="tc-history-hit" onclick="openHistorySearchResult('${safe(c.id)}','${safe(c.deck)}')">
-    <small>${safe(c.name||'Flashcard Set')} · ${safe(status)}${when?' · '+safe(when):''}</small>
+    <small>${safe(dateOnlySetLabel(c.name||'Flashcard Set'))} · ${safe(status)}${when?' · '+safe(when):''}</small>
     <strong>${safe(c.q)}</strong>
     <div class="tc-history-hit-line"><span>Correct answer:</span><b>${safe(c.a)}</b></div>
     <div class="tc-history-hit-line"><span>Your answer:</span><b>${result?safe(result.userAnswer):'Not answered yet'}</b></div>
@@ -5992,7 +6054,7 @@ function renderRecentActivity(){
  }
  rows.sort((a,b)=>b.time-a.time);
  if(!rows.length){$('recentActivity').innerHTML='<div class="empty-activity">Your generated flashcard sets will appear here.</div>';return;}
- const dateOnlySetLabel=(label)=>String(label||'Flashcard set').replace(/(?:,?\s+)\d{1,2}:\d{2}(?::\d{2})?(?:\s*[AP]\.?M\.?)?\s*$/i,'').trim();
+
  $('recentActivity').innerHTML=rows.slice(0,3).map(r=>`<div class="activity-row"><div class="mini-pdf"><svg class="icon" aria-hidden="true"><use href="#i-file"></use></svg></div><div class="activity-desc"><b title="${safe(r.name)}">${safe(r.name)}</b><span>${safe(dateOnlySetLabel(r.set))} · ${r.amount} cards</span></div><span class="status-pill ${r.state.toLowerCase()}">${r.state==='Approved'?'<svg class="tc-activity-status-check" viewBox="0 0 20 20" aria-hidden="true"><path d="M4 10l4 4 8-8"/></svg>':r.state==='Generated'?'✦ ':''}${r.state}</span></div>`).join('');
 }
 
@@ -6002,11 +6064,11 @@ function updateSearch(){
  const results=[];
  for(const deck of decks()){
   const set=cards.find(c=>c.deck===deck);
-  if(set&&(set.name+' '+set.pdf).toLowerCase().includes(q))results.push({label:set.name+' — '+set.pdf,detail:'Flashcard set',page:set.status==='approved'?'history':'sets',deck});
+  if(set&&(set.name+' '+set.pdf).toLowerCase().includes(q))results.push({label:dateOnlySetLabel(set.name)+' — '+set.pdf,detail:'Flashcard set',page:set.status==='approved'?'history':'sets',deck});
  }
  for(const c of cards){
   if((c.q+' '+c.a+' '+c.pdf).toLowerCase().includes(q)){
-   results.push({label:c.q,detail:(c.name||'Flashcard')+' · '+(c.status||'pending'),page:c.status==='approved'?'history':'sets',deck:c.deck});
+   results.push({label:c.q,detail:dateOnlySetLabel(c.name||'Flashcard')+' · '+(c.status||'pending'),page:c.status==='approved'?'history':'sets',deck:c.deck});
   }
   if(results.length>=12)break;
  }
