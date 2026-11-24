@@ -498,7 +498,7 @@ const BG_VERCEL_RUN_MS = boundedInteger('BG_VERCEL_RUN_MS', 45000, 5000, 120000)
 const BG_MAX_SOURCE_CHARS = boundedInteger('BG_MAX_SOURCE_CHARS', 120000, 10000, 250000);
 const BG_POLL_MS = boundedInteger('BG_POLL_MS', 3500, 2000, 15000);
 const BG_MAX_ATTEMPTS_PER_SET = boundedInteger('BG_MAX_ATTEMPTS_PER_SET', 6, 1, 20);
-const BG_MAX_STALLS = boundedInteger('BG_MAX_STALLS', 3, 1, 15);
+const BG_MAX_STALLS = boundedInteger('BG_MAX_STALLS', 5, 1, 15);
 let bgActive = 0;
 let bgTimer = null;
 let bgTickRunning = false;
@@ -672,12 +672,13 @@ async function bgProcessBatch(job, signal = null) {
     job.status = 'completed';
     job.message = 'All flashcards generated.';
   } else job.status = 'running';
+  console.info(`[TraceCard AI] Batch validation: requested=${want}, returned=${batch.length}, accepted=${added}`);
   return added;
 }
 function bgRetryLimitReached(job) {
   const currentSet = job.sets.find(s => s.status !== 'completed');
   return (job.stalls || 0) >= BG_MAX_STALLS ||
-    Boolean(currentSet && currentSet.attempts >= BG_MAX_ATTEMPTS_PER_SET);
+    Boolean(currentSet && (currentSet.attempts || 0) >= job.cardsPerSet + BG_MAX_ATTEMPTS_PER_SET);
 }
 async function bgRunOneJob(id) {
   const token = crypto.randomBytes(20).toString('hex');
@@ -712,7 +713,7 @@ async function bgRunOneJob(id) {
       if (!e?.cooldownOnly) job.failures = (job.failures || 0) + 1;
       const delay = Math.min(300000, Math.max(e?.retryAfterMs || 0, 3000 * 2 ** Math.min(Math.max(0,(job.failures || 0)-1), 5)));
       nextRunAt = Date.now() + delay;
-      if (job.failures >= BG_MAX_ATTEMPTS_PER_SET || bgRetryLimitReached(job)) {
+      if (!e?.cooldownOnly && (job.failures >= BG_MAX_ATTEMPTS_PER_SET || bgRetryLimitReached(job))) {
         job.status = 'failed';
         job.message = 'Generation stopped after repeated AI failures. Completed sets are saved; incomplete sets are not shown.';
       }
