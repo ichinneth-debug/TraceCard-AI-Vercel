@@ -4476,10 +4476,6 @@ $('clear').onclick=async()=>{
  save();
  tcBgRefreshReadyBell();
  tcUpdateCancelButton();
- const message=pdfDeleteError
-  ?'Generated sets and Recent Activity cleared. History, scores, and schedules were kept; some unused PDF files could not be removed.'
-  :'Generated sets and Recent Activity cleared. Review History, scores, and schedules were kept.';
- tcShowApprovalToast(message);
 };
 
 // SET MANAGEMENT
@@ -4551,7 +4547,6 @@ function approveAll(deck){
 
  save();
  show('review');
- tcShowApprovalToast(`${list.length} flashcard${list.length===1?'':'s'} approved and saved!`);
 }
 
 function edit(id){
