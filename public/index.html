@@ -2881,6 +2881,30 @@ html.tc-gen-active #info { display:none !important; }
 .tc-research-completion button{background:#ed650b!important;border-color:#ed650b!important;color:#fff!important}
 body[data-theme="dark"] .tc-research-completion .tc-research-code{background:#2d251e;border-color:#ff964d;color:#ffc18e}
 </style>
+<style id="tc-flashcard-action-dialog-style">
+#tcCardDialog{--dialog-bg:#fff;--dialog-ink:#14254b;--dialog-muted:#586781;--dialog-border:#dce3ee;--dialog-field:#fff;--dialog-soft:#fff1e5;--dialog-accent:#c54e06;box-sizing:border-box;width:min(560px,calc(100% - 28px));max-height:calc(100dvh - 28px);margin:auto;padding:0;border:1px solid var(--dialog-border);border-radius:22px;background:var(--dialog-bg);color:var(--dialog-ink);font-family:Poppins,Arial,sans-serif;box-shadow:0 22px 70px #101b3c45;overflow:auto;overscroll-behavior:contain}
+#tcCardDialog::backdrop{background:rgba(13,23,49,.57)}
+body[data-theme="dark"] #tcCardDialog{--dialog-bg:#19263d;--dialog-ink:#f2f6ff;--dialog-muted:#bdc9dd;--dialog-border:#41516a;--dialog-field:#132036;--dialog-soft:#443023;--dialog-accent:#ffb27c}
+#tcCardDialog form{padding:clamp(18px,4vw,28px);margin:0}
+#tcCardDialog .tc-card-modal-head{display:flex;align-items:flex-start;gap:13px;margin-bottom:18px}
+#tcCardDialog .tc-card-modal-icon{display:grid;place-items:center;flex:0 0 43px;height:43px;border-radius:13px;background:var(--dialog-soft);color:var(--dialog-accent);font-size:24px;line-height:1}
+#tcCardDialog .tc-card-modal-icon svg{width:23px;height:23px;fill:none;stroke:currentColor;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}
+#tcCardDialog h2{font-size:21px;line-height:1.3;margin:0 0 5px;font-weight:750;color:var(--dialog-ink)!important}
+#tcCardDialog p{font-size:13px;line-height:1.6;margin:0;color:var(--dialog-muted)!important}
+#tcCardDialog .tc-card-field{display:block;margin:0 0 13px;font-size:13px;font-weight:650;color:var(--dialog-ink)}
+#tcCardDialog textarea,#tcCardDialog input,#tcCardDialog select{display:block;box-sizing:border-box;width:100%;margin-top:6px;padding:11px 12px;border:1px solid var(--dialog-border)!important;border-radius:10px;background:var(--dialog-field)!important;color:var(--dialog-ink)!important;font:400 16px/1.5 Poppins,Arial,sans-serif;min-height:44px;resize:vertical}
+#tcCardDialog textarea{min-height:90px}
+#tcCardDialog .tc-card-modal-actions{display:flex;justify-content:flex-end;gap:10px;margin-top:19px}
+#tcCardDialog .tc-card-modal-actions button{min-height:46px;padding:11px 18px;border-radius:11px;font:650 14px Poppins,Arial,sans-serif;cursor:pointer}
+#tcCardDialog .tc-card-cancel{background:var(--dialog-field);color:var(--dialog-ink);border:1px solid var(--dialog-border)}
+#tcCardDialog .tc-card-submit{background:#e75b08;color:#fff;border:1px solid #e75b08}
+#tcCardDialog[data-mode="reject"] .tc-card-submit{background:#c73d50;border-color:#c73d50}
+#tcCardDialog[data-mode="reject"] .tc-card-modal-icon{background:#ffe9ec;color:#b42e43}
+#tcCardDialog #tcCardModalError{color:#be3448!important;margin-top:10px;font-size:13px}
+body[data-theme="dark"] #tcCardDialog #tcCardModalError{color:#ffacb7!important}
+#tcCardDialog [hidden]{display:none!important}
+@media(max-width:480px){#tcCardDialog .tc-card-modal-actions button{flex:1;padding:11px 8px}#tcCardDialog h2{font-size:19px}}
+</style>
 </head>
 <body data-theme="light">
 
@@ -3050,6 +3074,15 @@ body[data-theme="dark"] .tc-research-completion .tc-research-code{background:#2d
  <button type="button" id="tcGeneratedToastDismiss" aria-label="Dismiss notification" title="Dismiss">×</button>
 </div>
 
+
+<dialog id="tcCardDialog" aria-labelledby="tcCardModalTitle" aria-describedby="tcCardModalDescription">
+ <form id="tcCardModalForm" novalidate>
+  <div class="tc-card-modal-head"><span class="tc-card-modal-icon" id="tcCardModalIcon" aria-hidden="true"></span><div><h2 id="tcCardModalTitle"></h2><p id="tcCardModalDescription"></p></div></div>
+  <div id="tcCardModalFields"></div>
+  <p id="tcCardModalError" role="alert" hidden></p>
+  <div class="tc-card-modal-actions"><button type="button" class="tc-card-cancel" id="tcCardModalCancel">Cancel</button><button type="submit" class="tc-card-submit" id="tcCardModalSubmit">Save Changes</button></div>
+ </form>
+</dialog>
 
 <div id="tcClearConfirm" class="tc-clear-overlay" hidden>
   <div class="tc-clear-dialog" role="alertdialog" aria-modal="true" aria-labelledby="tcClearTitle" aria-describedby="tcClearMessage tcClearKept" tabindex="-1">
@@ -4510,20 +4543,44 @@ function change(id,status){
  if(newlyApproved)tcShowApprovalToast('Flashcard approved and saved!');
 }
 
-function rejectCard(id){
- if(confirm('Reject this flashcard?'))
-  change(id,'rejected');
+// Custom flashcard action dialogs: preserve the original card until the user confirms.
+function tcCardActionDialog({mode,title,description,submitLabel,buildFields,onSubmit}){
+ const dialog=$('tcCardDialog');
+ if(dialog.open)return;
+ const form=$('tcCardModalForm'),fields=$('tcCardModalFields'),error=$('tcCardModalError');
+ const cancel=$('tcCardModalCancel');
+ const previousFocus=document.activeElement;
+ dialog.dataset.mode=mode;
+ $('tcCardModalTitle').textContent=title;
+ $('tcCardModalDescription').textContent=description;
+ $('tcCardModalSubmit').textContent=submitLabel;
+ $('tcCardModalIcon').innerHTML=mode==='reject'
+  ?'<svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="m9 9 6 6m0-6-6 6"/></svg>'
+  :'<svg viewBox="0 0 24 24"><path d="m14 5 5 5M4 20l4-1 12-12a2 2 0 0 0-4-4L4 15z"/></svg>';
+ fields.replaceChildren();error.textContent='';error.hidden=true;
+ if(buildFields)buildFields(fields);
+ const cleanup=()=>{form.onsubmit=null;cancel.onclick=null;dialog.onclick=null;fields.replaceChildren();if(previousFocus?.isConnected)previousFocus.focus({preventScroll:true});};
+ dialog.addEventListener('close',cleanup,{once:true});
+ cancel.onclick=()=>dialog.close();
+ dialog.onclick=e=>{if(e.target===dialog){const r=dialog.getBoundingClientRect();if(e.clientX<r.left||e.clientX>r.right||e.clientY<r.top||e.clientY>r.bottom)dialog.close();}};
+ form.onsubmit=e=>{e.preventDefault();const problem=onSubmit();if(problem){error.textContent=problem;error.hidden=false;return;}dialog.close();};
+ dialog.showModal();
+ (mode==='reject'?cancel:fields.querySelector('textarea,input,select'))?.focus({preventScroll:true});
 }
-
+function tcCardEditField(parent,label,value,tag='input'){
+ const wrapper=document.createElement('label');wrapper.className='tc-card-field';wrapper.textContent=label;
+ const control=document.createElement(tag);if(tag==='input')control.type='text';control.value=value??'';control.setAttribute('aria-label',label);
+ wrapper.append(control);parent.append(wrapper);return control;
+}
+function rejectCard(id){
+ tcCardActionDialog({mode:'reject',title:'Reject this flashcard?',description:'This flashcard will be removed from the active set. You can restore rejected cards later.',submitLabel:'Reject Flashcard',onSubmit:()=>{change(id,'rejected');}});
+}
 function rejectSet(deck){
- if(!confirm('Reject this entire set?'))return;
-
- cards.filter(c=>c.deck===deck)
-  .forEach(c=>c.status='rejected');
-
- if(session?.deck===deck)session=null;
- opened='';
- save();
+ tcCardActionDialog({mode:'reject',title:'Reject this entire set?',description:'All flashcards in this set will be rejected. You can restore the set later.',submitLabel:'Reject Set',onSubmit:()=>{
+  cards.filter(c=>c.deck===deck).forEach(c=>c.status='rejected');
+  if(session?.deck===deck)session=null;
+  opened='';save();
+ }});
 }
 
 function restoreSet(deck){
@@ -4565,39 +4622,16 @@ function approveAll(deck){
 function edit(id){
  const c=cards.find(x=>x.id===id);
  if(!c)return;
-
- const q=prompt('Edit question:',c.q);
- if(!q?.trim())return;
-
- if(cardType(c)!=='mcq'){const answer=prompt(cardType(c)==='enumeration'?'Expected answers (separate with semicolons):':'Correct answer:',c.a);if(!answer?.trim())return;Object.assign(c,{q:clean(q),a:clean(answer),status:'pending'});save();return;}
- const opts=[];
-
- for(let i=0;i<4;i++){
-  const v=prompt('Choice '+(i+1),c.opts[i]);
-  if(!v?.trim())return;
-  opts.push(clean(v));
- }
-
- const entry=prompt(
-  'New correct choice: A, B, C or D (leave blank to keep current):',
-  ''
- );
-
- if(entry===null)return;
-
- const chosen=entry.trim().toUpperCase();
-
- if(chosen&&!['A','B','C','D'].includes(chosen))
-  return alert('Enter A, B, C or D.');
-
- const a=chosen?opts['ABCD'.indexOf(chosen)]:c.a;
-
- if(new Set(opts.map(v=>v.toLowerCase())).size!==4||
-  !opts.some(v=>v.toLowerCase()===a.toLowerCase()))
-  return alert('Four unique choices are required.');
-
- Object.assign(c,{q:clean(q),opts,a,status:'pending'});
- save();
+ let question;
+ tcCardActionDialog({mode:'edit',title:'Edit Flashcard',description:'Update the question before approving this card. The original answer and choices will remain unchanged.',submitLabel:'Save Changes',buildFields:fields=>{
+  question=tcCardEditField(fields,'Question',c.q,'textarea');
+ },onSubmit:()=>{
+  const q=clean(question.value);if(!q)return 'Please enter a question.';
+  if(!cards.includes(c))return 'This flashcard is no longer available.';
+  if(cardType(c)==='fillblank'&&(q.match(/____/g)||[]).length!==1)return 'Keep exactly one ____ blank in the question.';
+  Object.assign(c,{q,status:'pending'});
+  save();
+ }});
 }
 
 // FLASHCARD SETS DISPLAY
