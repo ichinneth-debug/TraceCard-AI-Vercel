@@ -2825,6 +2825,21 @@ body[data-theme="dark"] #tcGeneratedReadyBell:hover{background:#22503d}
 }
 </style>
 
+<style id="tc-manage-data-style">
+#tcManageDataDialog{margin:auto;max-width:calc(100% - 36px);max-height:calc(100dvh - 36px)}
+#tcManageDataDialog::backdrop{background:rgba(9,18,43,.65)}
+#tcManageDataDialog:not([open]){display:none}
+#tcManageDataDialog .tc-manage-option{display:flex;align-items:flex-start;gap:12px;border:1px solid #dce5f0;border-radius:12px;padding:13px;margin:0 0 10px;cursor:pointer;color:inherit;background:transparent}
+#tcManageDataDialog .tc-manage-option span{display:grid;gap:4px;min-width:0}
+#tcManageDataDialog .tc-manage-option small{font-size:12px;line-height:1.5;color:#51647c}
+#tcManageDataDialog input[type=checkbox]{appearance:auto;accent-color:#e96c25;flex:0 0 18px;width:18px;height:18px;margin:2px 0 0;padding:0;cursor:pointer}
+#tcManageDataDialog .tc-manage-all{display:flex;align-items:center;gap:10px;margin:12px 0 16px;color:inherit;font-size:14px;font-weight:600}
+#tcManageDataDialog button:disabled,#tcManageDataDialog label:has(input:disabled){opacity:.5;cursor:not-allowed}
+body[data-theme="dark"] #tcManageDataDialog .tc-manage-option{border-color:#4a5b79}
+body[data-theme="dark"] #tcManageDataDialog .tc-manage-option small{color:#c5d0e6}
+#settings #tcManageDataOpen{display:inline-flex;align-items:center;gap:8px;color:#a6430d;background:#fff5ec;border:1px solid #f2c6b1}
+body[data-theme="dark"] #settings #tcManageDataOpen{color:#ffd1b5;background:#293a56;border-color:#4a5b79}
+</style>
 <style id="tc-clear-confirm-design">
 /* Styled, accessible replacement for native browser confirms when clearing data. */
 .tc-clear-overlay[hidden]{display:none!important}
@@ -2977,6 +2992,27 @@ body[data-theme="dark"] #bellMessage .tc-bell-pdf-summary small {
 }
 body[data-theme="dark"] #bellMessage .tc-bell-chevron {color:#bac9e1!important;opacity:1;}
 </style>
+<style id="tc-desktop-icon-theme-toggle">
+/* Match the existing mobile moon/sun switch on desktop, keeping the utility row compact. */
+@media (min-width:1151px) {
+  .sidebar .topbar {margin-left:auto!important;justify-content:flex-end!important;}
+  .sidebar .top-actions {width:auto!important;justify-content:flex-end!important;gap:8px!important;}
+  .sidebar .tc-header-separator {display:none!important;}
+  .sidebar #headerThemeToggle {
+    display:inline-flex!important;align-items:center!important;justify-content:center!important;
+    flex:0 0 42px!important;width:42px!important;min-width:42px!important;
+    height:42px!important;min-height:0!important;padding:0!important;margin:0!important;
+    border-radius:12px!important;font-size:0!important;line-height:0!important;
+  }
+  .sidebar #headerThemeToggle .tc-theme-label {display:none!important;}
+  .sidebar #headerThemeToggle::after {content:none!important;display:none!important;}
+  .sidebar #headerThemeToggle .tc-theme-icon {width:25px!important;height:25px!important;flex:0 0 auto!important;stroke:currentColor!important;}
+  body[data-theme="light"] .sidebar #headerThemeToggle .tc-theme-moon {display:block!important;}
+  body[data-theme="dark"] .sidebar #headerThemeToggle .tc-theme-sun {display:block!important;}
+  body[data-theme="light"] .sidebar #headerThemeToggle {color:#203353!important;background:rgba(255,255,255,.15)!important;border-color:#dae3ef!important;}
+  body[data-theme="dark"] .sidebar #headerThemeToggle {color:#f0f4ff!important;background:#29364e!important;border-color:#4e5b73!important;}
+}
+</style>
 </head>
 <body data-theme="light">
 
@@ -3032,7 +3068,7 @@ body[data-theme="dark"] #bellMessage .tc-bell-chevron {color:#bac9e1!important;o
     <path d="M40 45c1 9-8 24-12 26-4 2-5-2-2-4 5-4 25-9 33-7 5 2 1 6-3 5-9-2-19-15-16-22 1-2 3-1 0 2Z" stroke="#D52A2E" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>
   </g>
 </svg></div><span class="drop-primary">Drag &amp; drop your PDF here</span><span class="drop-or">or</span><span class="choose-button"><svg class="icon" aria-hidden="true"><use href="#i-upload"></use></svg>Choose File</span></label>
-    <p class="upload-note">Supported: Text-based PDF files.</p><div class="upload-status" id="uploadSummary" aria-live="polite"></div>
+    <div class="upload-status" id="uploadSummary" aria-live="polite"></div>
    </div>
    <div class="panel generate-panel" id="generationSettings"><h2>Flashcard Generation</h2><div class="generate-controls">
     <div class="tc-gen-field tc-gen-field--question">
@@ -3047,7 +3083,7 @@ body[data-theme="dark"] #bellMessage .tc-bell-chevron {color:#bac9e1!important;o
      <span class="tc-gen-label" id="cardAmount-label">Cards per set</span>
      <select id="cardAmount" aria-labelledby="cardAmount-label"><option>10</option><option selected>20</option><option>30</option></select>
     </div>
-   </div><div class="generate-actions"><button id="make" class="btn-primary" disabled>Generate Flashcards</button><button id="cancelGeneration" class="btn-secondary tc-cancel-generation" type="button" hidden disabled aria-label="Cancel current flashcard generation">Cancel Generation</button><button id="clear" class="btn-secondary">Clear Generated Data</button></div><p id="info" role="status">No PDF selected.</p><div id="tcGenProgress" class="tc-gen-progress" hidden aria-live="polite">
+   </div><div class="generate-actions"><button id="make" class="btn-primary" disabled>Generate Flashcards</button><button id="cancelGeneration" class="btn-secondary tc-cancel-generation" type="button" hidden disabled aria-label="Cancel current flashcard generation">Cancel Generation</button></div><p id="info" role="status">No PDF selected.</p><div id="tcGenProgress" class="tc-gen-progress" hidden aria-live="polite">
  <div class="tc-gen-progress-header"><strong id="tcGenProgressTitle">Flashcard Generation:</strong><span id="tcGenProgressCount">0 of 20 saved</span></div>
  <div id="tcGenProgressTrack" class="tc-gen-progress-track" role="progressbar" aria-label="Successfully saved flashcards" aria-valuemin="0" aria-valuemax="20" aria-valuenow="0"><div id="tcGenProgressFill" class="tc-gen-progress-fill"></div></div>
   <p id="tcGenProgressNote" class="tc-gen-progress-note">Progress is saved after each valid flashcard.</p>
@@ -3064,10 +3100,10 @@ body[data-theme="dark"] #bellMessage .tc-bell-chevron {color:#bac9e1!important;o
 <section id="review"><button class="tc-back" onclick="appBack()"><svg class="tc-back-arrow" viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M19 12H5m7-7-7 7 7 7" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg><span>Back</span></button><div class="page-heading"><div class="page-heading-icon"><svg class="icon" aria-hidden="true"><use href="#i-calendar"></use></svg></div><div><h1>Review</h1></div></div><div class="content-stack" id="quiz"></div></section>
 <section id="history"><button class="tc-back" onclick="appBack()"><svg class="tc-back-arrow" viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M19 12H5m7-7-7 7 7 7" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg><span>Back</span></button>
 <div class="page-heading tc-history-heading"><div class="page-heading-icon"><svg class="icon" aria-hidden="true"><use href="#i-history"></use></svg></div><div class="tc-history-heading-copy"><h1>Review History</h1></div>
-<div class="tc-history-tools"><button type="button" id="historySearchToggle" class="tc-history-search-toggle" aria-controls="historySearchPanel" aria-expanded="false" onclick="toggleHistorySearch()"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 6h16M4 12h16M4 18h16"/><circle cx="9" cy="6" r="2.5" fill="var(--tc-history-button-bg,#fff)"/><circle cx="16" cy="12" r="2.5" fill="var(--tc-history-button-bg,#fff)"/><circle cx="10" cy="18" r="2.5" fill="var(--tc-history-button-bg,#fff)"/></svg><span>Search &amp; Filters</span><span class="tc-history-search-active" id="historySearchActive" hidden></span></button><button type="button" id="clearReviewHistory" class="tc-history-clear-btn" onclick="clearReviewHistory()"><svg class="icon" aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18M8 6V4h8v2m3 0-1 14H6L5 6m5 4v6m4-6v6"/></svg><span>Clear Review History</span></button></div></div>
+<div class="tc-history-tools"><button type="button" id="historySearchToggle" class="tc-history-search-toggle" aria-controls="historySearchPanel" aria-expanded="false" onclick="toggleHistorySearch()"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 6h16M4 12h16M4 18h16"/><circle cx="9" cy="6" r="2.5" fill="var(--tc-history-button-bg,#fff)"/><circle cx="16" cy="12" r="2.5" fill="var(--tc-history-button-bg,#fff)"/><circle cx="10" cy="18" r="2.5" fill="var(--tc-history-button-bg,#fff)"/></svg><span>Search &amp; Filters</span><span class="tc-history-search-active" id="historySearchActive" hidden></span></button></div></div>
 <div id="historySearchPanel" class="tc-history-search-panel" hidden><div class="tc-history-search-field"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="m16 16 5 5"/></svg><input id="historySearchInput" type="search" placeholder="Type a title, topic or question" autocomplete="off" oninput="searchReviewHistory(this.value)" aria-label="Search review history by title, topic or question"><button type="button" id="historySearchClear" onclick="clearHistorySearchQuery()">Clear</button></div></div>
 <div class="content-stack" id="historyContent"></div></section>
-<section id="settings"><div class="page-heading"><div class="page-heading-icon"><svg class="icon" aria-hidden="true"><use href="#i-settings"></use></svg></div><div><h1>Settings</h1><p>Review notifications, calendar schedules, and local data.</p></div></div><div class="panel settings-panel"><div class="setting-block"><h3>Review Notifications</h3><p>Receive an alert when approved flashcards are due, while this website is open.</p><div class="reminder-actions"><button id="enableNotifications">Enable Notifications</button></div><small id="notificationStatus"></small></div><div class="setting-block"><h3>Google Calendar</h3><p>Add each scheduled review date to Google Calendar, or download all dates as a calendar file.</p><div class="reminder-actions"><button id="calendarNext">Add Review Dates to Google Calendar</button></div></div><div class="setting-block"><h3>Your Data</h3><p>Flashcards and history are stored locally in this browser. Clear Generated Data removes generated and approved sets, their entries in Recent Activity, unfinished drafts, and saved source PDFs. Completed Review History, answers, and scores are kept. Use Clear Review History separately to delete review results. Your appearance settings are kept.</p></div></div></section>
+<section id="settings"><div class="page-heading"><div class="page-heading-icon"><svg class="icon" aria-hidden="true"><use href="#i-settings"></use></svg></div><div><h1>Settings</h1><p>Review notifications, calendar schedules, and local data.</p></div></div><div class="panel settings-panel"><div class="setting-block"><h3>Review Notifications</h3><p>Receive an alert when approved flashcards are due, while this website is open.</p><div class="reminder-actions"><button id="enableNotifications">Enable Notifications</button></div><small id="notificationStatus"></small></div><div class="setting-block"><h3>Google Calendar</h3><p>Add each scheduled review date to Google Calendar, or download all dates as a calendar file.</p><div class="reminder-actions"><button id="calendarNext">Add Review Dates to Google Calendar</button></div></div><div class="setting-block"><h3>Manage Data</h3><div class="reminder-actions"><button type="button" id="tcManageDataOpen" class="tc-history-clear-btn" aria-haspopup="dialog"><svg class="icon" aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18M8 6V4h8v2m3 0-1 14H6L5 6m5 4v6m4-6v6"/></svg>Manage Data</button></div></div></div></section>
 <section id="help">
   <div class="page-heading">
     <div class="page-heading-icon"><svg class="icon" aria-hidden="true"><use href="#i-help"></use></svg></div>
@@ -3157,6 +3193,17 @@ body[data-theme="dark"] #bellMessage .tc-bell-chevron {color:#bac9e1!important;o
  </form>
 </dialog>
 
+<dialog id="tcManageDataDialog" class="tc-clear-dialog tc-manage-dialog" aria-labelledby="tcManageDataTitle" aria-describedby="tcManageDataDesc">
+  <div class="tc-clear-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M3 6h18M8 6V4h8v2m3 0-1 14H6L5 6m5 4v6m4-6v6"/></svg></div>
+  <h2 id="tcManageDataTitle">Manage Data</h2>
+  <p id="tcManageDataDesc" class="tc-clear-message">Select the data you want to delete.</p>
+  <label class="tc-manage-option"><input type="checkbox" id="tcManageGenerated"><span><strong>Generated Data</strong><small>Generated flashcards, drafts, and Recent Activity.</small></span></label>
+  <label class="tc-manage-option"><input type="checkbox" id="tcManageHistory"><span><strong>Review History</strong><small>Review answers, scores, and review schedules.</small></span></label>
+  <label class="tc-manage-all"><input type="checkbox" id="tcManageAll"> Select All</label>
+  <p id="tcManageStatus" class="tc-clear-message" role="status" hidden></p>
+  <p class="tc-clear-kept">This action cannot be undone.</p>
+  <div class="tc-clear-actions"><button type="button" class="tc-clear-cancel" id="tcManageCancel">Cancel</button><button type="button" class="tc-clear-proceed" id="tcManageProceed" disabled>Clear Selected Data</button></div>
+</dialog>
 <div id="tcClearConfirm" class="tc-clear-overlay" hidden>
   <div class="tc-clear-dialog" role="alertdialog" aria-modal="true" aria-labelledby="tcClearTitle" aria-describedby="tcClearMessage tcClearKept" tabindex="-1">
     <div class="tc-clear-icon" aria-hidden="true">
@@ -3650,11 +3697,11 @@ function drawReminders(){
  const next=nextReviewDate();
  const upcoming=scheduledCards();
  if(dueCards.length){
-  content.innerHTML=`<div class="reminder due-now"><div class="reminder-copy"><b>You have ${dueCards.length} flashcard${dueCards.length===1?'':'s'} due for review today!</b><p>Make every review count and keep what you’ve learned fresh in your mind.</p></div><button type="button" onclick="session=null;save();show('review')">▷ &nbsp;Review Now</button></div>`;
+  content.innerHTML=`<div class="reminder due-now"><div class="reminder-copy"><b>You have ${dueCards.length} flashcard${dueCards.length===1?'':'s'} due for review today!</b></div><button type="button" onclick="session=null;save();show('review')">▷ &nbsp;Review Now</button></div>`;
  }else if(next){
   content.innerHTML=`<div class="reminder"><div class="reminder-copy"><b>Next Review: ${safe(next.toLocaleDateString(undefined,{year:'numeric',month:'short',day:'numeric'}))}</b><p>${upcoming.length} flashcard(s) scheduled for review.</p></div><button type="button" onclick="calendarEvent()">Add to Calendar</button></div>`;
  }else{
-  content.innerHTML=`<div class="reminder empty"><div class="reminder-copy"><b>No flashcards due for review</b><p>Approve a set to start your learning schedule.</p></div><button type="button" onclick="show('sets')">View Sets</button></div>`;
+  content.innerHTML=`<div class="reminder empty"><div class="reminder-copy"><b>No flashcards due for review</b></div><button type="button" onclick="show('sets')">View Sets</button></div>`;
  }
  $('calendarNext').disabled=!next;
  tcRenderBellSchedule();
@@ -3923,7 +3970,7 @@ function tcUpdateCancelButton(){
  document.documentElement.classList.toggle('tc-gen-active',activelyGenerating);
  button.hidden=!activelyGenerating;
  button.disabled=tcBgCancelling||tcBgStarting||tcGenerationCancelRequested||!(tcLegacyGenerating||activeBackground);
- $('clear').disabled=tcBgCancelling||tcBgStarting||tcLegacyGenerating||activeBackground;
+ tcManageRefresh();
  button.textContent=tcBgCancelling||tcGenerationCancelRequested?'Cancelling...':'Cancel Generation';
 }
 
@@ -4526,12 +4573,12 @@ $('cancelGeneration').onclick=async()=>{
 
 // CLEAR GENERATED DATA ONLY: remove generated-file entries and active cards.
 // Preserve separate Review History scores and a history-only snapshot of reviewed questions.
-$('clear').onclick=async()=>{
+async function tcClearGeneratedData(skipConfirm=false){
  if(tcLegacyGenerating||tcBgStarting||tcBgCancelling){alert('Cancel the active generation first.');return;}
  if(tcBgGet()&&!['failed','cancelled'].includes(tcBgGet().lastStatus||'')){
   alert('Cancel the active background generation before clearing all data.');return;
  }
- if(!await tcConfirmClear({
+ if(!skipConfirm&&!await tcConfirmClear({
   title:'Clear Generated Data?',
   description:'All generated flashcards and related files will be deleted. This cannot be undone.',
   kept:'Your Review History, answers, scores, schedules, and required PDFs will be kept. To remove review data, use Clear Review History.',
@@ -4587,11 +4634,12 @@ $('clear').onclick=async()=>{
  $('tcBgStatus').hidden=true;
  $('make').textContent='Generate Flashcards';
  $('make').disabled=true;
- $('info').textContent='Generated flashcards cleared. Review History, scores, and review schedules were kept. Choose a PDF to start again.';
+ $('info').textContent='No PDF selected.';
  save();
  tcBgRefreshReadyBell();
  tcUpdateCancelButton();
-};
+ return true;
+}
 
 // SET MANAGEMENT
 
@@ -5042,10 +5090,10 @@ function rate(id,rating,days){
 
 // HISTORY
 
-async function clearReviewHistory(){
+async function clearReviewHistory(skipConfirm=false){
  const hasHistory=logs.length>0||archivedCards.length>0||cards.some(c=>c.next)||!!(session&&Object.keys(session.answers||{}).length);
- if(!hasHistory)return;
- if(!await tcConfirmClear({
+ if(!hasHistory&&!skipConfirm)return;
+ if(!skipConfirm&&!await tcConfirmClear({
   title:'Clear Review History?',
   description:'This permanently deletes your review answers, scores, next-review schedules, and saved Review History on this device.',
   kept:'Your flashcards, Recent Activity, and research verification records will be kept. You can review approved cards again.',
@@ -5065,6 +5113,56 @@ async function clearReviewHistory(){
  save();
  // Clear Review History silently; retain the confirmation dialog.
 }
+
+// Settings owns the two local-data actions. No data is deleted until final confirmation.
+let tcManageBusy=false;
+function tcManageGenerationActive(){
+ const job=tcBgGet();
+ return Boolean(tcLegacyGenerating||tcBgStarting||tcBgCancelling||tcGenerationCancelRequested||job&&!['failed','cancelled'].includes(String(job.lastStatus||'').toLowerCase()));
+}
+function tcManageRefresh(){
+ const dialog=$('tcManageDataDialog');if(!dialog||!dialog.open)return;
+ const generated=$('tcManageGenerated'),history=$('tcManageHistory'),all=$('tcManageAll'),proceed=$('tcManageProceed');
+ const active=tcManageGenerationActive();
+ generated.disabled=active||tcManageBusy;
+ history.disabled=tcManageBusy;
+ if(active)generated.checked=false;
+ all.disabled=active||tcManageBusy;
+ all.checked=generated.checked&&history.checked;
+ all.indeterminate=generated.checked!==history.checked;
+ proceed.disabled=tcManageBusy||!(generated.checked||history.checked);
+ proceed.textContent=all.checked?'Clear All Data':'Clear Selected Data';
+ $('tcManageStatus').hidden=!active;
+ $('tcManageStatus').textContent=active?'Cancel or finish generation before clearing generated data.':'';
+}
+$('tcManageDataOpen').addEventListener('click',()=>{
+ if(tcManageBusy||tcClearPending)return;
+ $('tcManageGenerated').checked=false;$('tcManageHistory').checked=false;
+ $('tcManageDataDialog').showModal();tcManageRefresh();$('tcManageCancel').focus();
+});
+$('tcManageGenerated').addEventListener('change',tcManageRefresh);
+$('tcManageHistory').addEventListener('change',tcManageRefresh);
+$('tcManageAll').addEventListener('change',()=>{
+ if($('tcManageAll').disabled)return;
+ $('tcManageGenerated').checked=$('tcManageHistory').checked=$('tcManageAll').checked;tcManageRefresh();
+});
+$('tcManageCancel').addEventListener('click',()=>$('tcManageDataDialog').close());
+$('tcManageProceed').addEventListener('click',async()=>{
+ if(tcManageBusy)return;
+ tcManageRefresh();
+ const generated=$('tcManageGenerated').checked,history=$('tcManageHistory').checked;
+ if(!generated&&!history)return;
+ tcManageBusy=true;$('tcManageDataDialog').close();
+ try{
+  if(generated&&history){
+   if(!await tcConfirmClear({title:'Clear All Data?',description:'Generated flashcards, drafts, Recent Activity, review answers, scores, schedules, and locally saved source PDFs will be deleted. This cannot be undone.',kept:'Research verification records and appearance settings will be kept.',confirmLabel:'Clear All Data'}))return;
+   if(tcManageGenerationActive())return;
+   const cleared=await tcClearGeneratedData(true);
+   if(cleared)await clearReviewHistory(true);
+  }else if(generated){await tcClearGeneratedData();}
+  else{await clearReviewHistory();}
+ }finally{tcManageBusy=false;}
+});
 
 function latestResults(deck){
  const map=new Map();
@@ -5133,8 +5231,7 @@ function drawHistoryGlobalSearch(historyCards){
 }
 
 function drawHistory(){
- const clearButton=$('clearReviewHistory');
- if(clearButton)clearButton.disabled=!(logs.length||archivedCards.length||cards.some(c=>c.next)||(session&&Object.keys(session.answers||{}).length));
+ tcManageRefresh();
  const content=$('historyContent');
  const historyCards=[...archivedCards.filter(a=>!cards.some(c=>c.id===a.id)),...cards];
  const searchIndicator=$('historySearchActive');
