@@ -1,6 +1,8 @@
 'use strict';
 
-require('dotenv').config();
+try { require('dotenv').config(); } catch (error) {
+  if (error?.code !== 'MODULE_NOT_FOUND') throw error;
+}
 const express = require('express');
 const path = require('path');
 
@@ -32,8 +34,6 @@ const PROVIDERS = [
   },
 ];
 
-// Fastest configured provider first by default. Customize without code changes:
-// AI_PROVIDER_ORDER=groq,gemini,openai,openrouter
 const preferredProviders=(process.env.AI_PROVIDER_ORDER || 'groq,gemini,openai,openrouter')
   .toLowerCase().split(',').map(x=>x.trim()).filter(Boolean);
 PROVIDERS.sort((a,b)=>{
@@ -133,8 +133,6 @@ function runQueue() {
   }
 }
 
-// Verify excerpts against the PAGE N text sent in the request, where available.
-// This mirrors the browser's traceability check without logging any PDF contents.
 function quotedInSource(prompt, page, excerpt) {
   if (typeof prompt !== 'string') return true;
   const marker = /^PAGE (\d+):\s*/gm;
@@ -218,7 +216,7 @@ function parseFlashcards(raw, requestedType = null, prompt = null) {
     }
     valid.push({ type, question, answer, choices, page, source_excerpt: excerpt });
   }
-  // Only aggregate diagnostics: never print student PDF text, questions, or keys.
+
   if (valid.length < list.length) {
     console.warn(`[TraceCard AI] Provider validation: ${valid.length}/${list.length} accepted; rejected=${JSON.stringify(reasons)}`);
   }
@@ -438,9 +436,6 @@ async function handleGenerate(req, res) {
 app.post('/api/gemini', handleGenerate);
 app.post('/api/flashcards', handleGenerate);
 
-// Durable background-generation jobs. Requires UPSTASH_REDIS_REST_URL +
-// UPSTASH_REDIS_REST_TOKEN. No client PDF binary or provider keys are stored.
-// The job ID is a secret bearer capability. Keep it out of URLs and logs.
 const crypto = require('crypto');
 const REDIS_URL = (process.env.UPSTASH_REDIS_REST_URL || '').trim().replace(/\/$/, '');
 const REDIS_TOKEN = (process.env.UPSTASH_REDIS_REST_TOKEN || '').trim();
@@ -507,7 +502,7 @@ async function bgSaveClaimed(job, token, nextRunAt) {
   const result = await bgRedis('EVAL', BG_SAVE_SCRIPT, 4,
     bgKey(job.id), bgLockKey(job.id), BG_DUE_KEY, bgCancelKey(job.id),
     token, JSON.stringify(job), BG_TTL_SECONDS, done ? 'done' : 'due', job.id, nextRunAt);
-  if (Number(result) === 2) return; // User cancelled: do not save an in-flight batch.
+  if (Number(result) === 2) return; 
   if (Number(result) !== 1) throw new AIError('Background job lease expired; will recover from checkpoint.', 503);
 }
 async function bgUnlock(id, token) {
@@ -576,7 +571,7 @@ async function bgProcessBatch(job, signal = null) {
     if (job.sets.every(s => s.status === 'completed')) job.status = 'completed';
     return 0;
   }
-  // A full 10-card set can finish in one AI call when the provider returns valid cards.
+
   const want = Math.min(10, quota[type] - set.cards.filter(c => c.type === type).length);
   const selection = Array.from({ length: Math.min(5, job.pages.length) }, (_, i) =>
     job.pages[(set.setNumber * 3 + (set.attempts || 0) * 5 + i) % job.pages.length].page);
@@ -609,7 +604,7 @@ async function bgRunOneJob(id) {
     if (!job || ['completed', 'failed', 'cancelled'].includes(job.status)) {
       await bgRedis('ZREM', BG_DUE_KEY, id);return;
     }
-    // Other workers will not claim the same job during this provider request.
+
     await bgRedis('ZADD', BG_DUE_KEY, Date.now() + BG_LEASE_SECONDS * 1000, id);
     job.status = 'running';
     const aborter = new AbortController();
@@ -624,7 +619,7 @@ async function bgRunOneJob(id) {
         job.status = 'failed';
         job.message = 'Generation stopped because the AI could not produce enough valid, unique source-linked cards.';
       }
-      // Keep student jobs fair: one batch at a time, next turn goes to queue.
+
     } catch (e) {
       job.failures = (job.failures || 0) + 1;
       const delay = Math.min(180000, 10000 * 2 ** Math.min(job.failures - 1, 5));
@@ -651,8 +646,7 @@ async function bgTick() {
       void bgRunOneJob(id).catch(e => console.warn(`[TraceCard AI] Background worker: ${e?.message || 'error'}`))
         .finally(() => {
           bgActive--;bgLocalProcessing.delete(id);
-          // Skip the idle 3.5s polling gap between successful batches, without
-          // increasing the Redis polling frequency while the queue is empty.
+
           const next=setTimeout(() => { void bgTick(); }, 450);
           next.unref?.();
         });
@@ -677,7 +671,7 @@ function bgBasicRateLimit(req) {
   if (now >= window.until) { window.count = 0; window.until = now + 60000; }
   window.count++;
   bgRate.set(key, window);
-  // Generous for classrooms sharing a single network IP.
+
   return window.count <= 60;
 }
 function bgValidateRequest(body) {
@@ -725,11 +719,11 @@ app.post('/api/generation-jobs', async (req, res) => {
       failures: 0, stalls: 0,
       sets: Array.from({ length: input.setCount }, (_, i) => ({setNumber:i+1, status:'queued', attempts:0, cards:[]})),
     };
-    // Atomically commit the job data and queue entry. Job IDs are high-entropy.
+
     const script = `redis.call('SET', KEYS[1], ARGV[1], 'EX', ARGV[2]); redis.call('ZADD', KEYS[2], ARGV[3], ARGV[4]); return 1`;
     await bgRedis('EVAL', script, 2, bgKey(id), BG_DUE_KEY,
       JSON.stringify(job), BG_TTL_SECONDS, Date.now(), id);
-    // Job is safely stored BEFORE sending a success response to the browser.
+   
     res.status(202).json(bgPublic(job));
     void bgTick();
   } catch (e) {
@@ -738,9 +732,6 @@ app.post('/api/generation-jobs', async (req, res) => {
   }
 });
 
-// A job ID is a high-entropy bearer capability; never expose it in logs.
-// Cancellation stops future batches. An AI request already in flight may finish,
-// but its results cannot overwrite the cancelled checkpoint (BG_SAVE_SCRIPT).
 const BG_CANCEL_SCRIPT = `
 local raw = redis.call('GET', KEYS[1])
 if not raw then return 0 end
@@ -770,8 +761,7 @@ app.post('/api/generation-jobs/:jobId/cancel', async (req, res) => {
     const result = await bgRedis('EVAL', BG_CANCEL_SCRIPT, 3,
       bgKey(id), BG_DUE_KEY, bgCancelKey(id), BG_TTL_SECONDS, id, Date.now());
     if (Number(result) === 0) return res.status(404).json({error:'Job not found on this server/Redis instance. Verify Vercel server deployment and UPSTASH_REDIS_REST_URL.'});
-    // Abort a request in flight on this process. Other workers use Redis cancel flag
-    // and cannot save any later partial result after this atomic cancellation.
+   
     if (Number(result) === 1 || Number(result) === 3) bgRunningControllers.get(id)?.abort();
     const job = await bgGet(id);
     if (!job) return res.status(404).json({error:'Job not found or expired.'});
@@ -790,12 +780,18 @@ app.get('/api/generation-jobs/:jobId', async (req, res) => {
 });
 
 app.get(['/', '/index.html'], (req, res) => {
-  res.sendFile(path.join(__dirname, 'index.html'));
+
+  const fs = require('fs');
+  const publicHome = path.join(__dirname, 'public', 'index.html');
+  const rootHome = path.join(__dirname, 'index.html');
+  const home = fs.existsSync(publicHome) ? publicHome : rootHome;
+  if (fs.existsSync(home)) return res.sendFile(home);
+  return res.status(404).json({error:'Frontend not found. Put index.html in public/.'});
 });
 app.use('/assets', express.static(path.join(__dirname, 'assets'), { dotfiles: 'deny' }));
 app.use((req, res) => res.status(404).json({ error: 'Not found.' }));
 
-if (require.main === module) {
+if (require.main === module && !process.env.VERCEL) {
   if (process.argv.includes('--worker')) {
     if (!BG_CONFIGURED) {
       console.error('Worker requires UPSTASH_REDIS_REST_URL and UPSTASH_REDIS_REST_TOKEN.');
@@ -807,11 +803,14 @@ if (require.main === module) {
     app.listen(PORT, () => {
       console.log(`TraceCard AI running at http://localhost:${PORT}`);
       console.log('Configured AI providers:', PROVIDERS.filter(p => p.key).map(p => p.id).join(' -> ') || 'none');
-      bgStartWorker(); // Also works in a single service; free tiers may sleep while idle.
+      bgStartWorker(); 
     });
   }
 }
 
-module.exports = { app, parseFlashcards, extractGeminiText, generateFlashcards, buildResponseSchema, requestedCardType };
-
+module.exports = app;
+Object.assign(module.exports, {
+  app, parseFlashcards, extractGeminiText,
+  generateFlashcards, buildResponseSchema, requestedCardType,
+});
 if (process.env.NODE_ENV === 'test') module.exports.__test = {bgTick, bgGet, bgValidateRequest, bgRunOneJob};
