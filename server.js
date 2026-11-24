@@ -1,5 +1,6 @@
 'use strict';
 
+// Vercel supplies environment variables directly. Load .env only when available locally.
 try { require('dotenv').config(); } catch (error) {
   if (error?.code !== 'MODULE_NOT_FOUND') throw error;
 }
@@ -12,28 +13,29 @@ app.disable('x-powered-by');
 const PORT = Number(process.env.PORT || 3000);
 const PROVIDERS = [
   {
+    id: 'groq',
+    key: process.env.GROQ_API_KEY?.trim(),
+    model: process.env.GROQ_MODEL?.trim() || 'openai/gpt-oss-20b',
+  },
+  {
     id: 'gemini',
     key: process.env.GEMINI_API_KEY?.trim(),
     model: process.env.GEMINI_MODEL?.trim() || 'gemini-3.6-flash',
   },
   {
-    id: 'groq',
-    key: process.env.GROQ_API_KEY?.trim(),
-    model: process.env.GROQ_MODEL?.trim() || 'openai/gpt-oss-20b',
+    id: 'openai',
+    key: process.env.OPENAI_API_KEY?.trim(),
+    model: process.env.OPENAI_MODEL?.trim() || 'gpt-4.1-mini',
   },
   {
     id: 'openrouter',
     key: process.env.OPENROUTER_API_KEY?.trim(),
     model: process.env.OPENROUTER_MODEL?.trim() || 'openrouter/free',
   },
-
-  {
-    id: 'openai',
-    key: process.env.OPENAI_API_KEY?.trim(),
-    model: process.env.OPENAI_MODEL?.trim() || 'gpt-4.1-mini',
-  },
 ];
 
+// Fastest configured provider first by default. Customize without code changes:
+// AI_PROVIDER_ORDER=groq,gemini,openai,openrouter
 const preferredProviders=(process.env.AI_PROVIDER_ORDER || 'groq,gemini,openai,openrouter')
   .toLowerCase().split(',').map(x=>x.trim()).filter(Boolean);
 PROVIDERS.sort((a,b)=>{
@@ -133,22 +135,41 @@ function runQueue() {
   }
 }
 
+// Keep strict page + 10-160 character checks, but tolerate punctuation/dash differences.
+// Checking both forms handles "sodium-potassium" vs "sodium potassium" while
+// rejecting excerpts that are not actually present on the referenced PDF page.
+function normalizeExcerptText(value, punctuationAsSpace = false) {
+  const text = String(value ?? '').normalize('NFKC').toLowerCase();
+  const normalized = punctuationAsSpace
+    ? text.replace(/[^a-z0-9\s]/g, ' ')
+    : text.replace(/[^a-z0-9\s]/g, '');
+  return normalized.replace(/\s+/g, ' ').trim();
+}
+function sourceExcerptOnPage(pageText, excerpt) {
+  if (typeof excerpt !== 'string' || excerpt.length < 10 || excerpt.length > 160 ||
+      typeof pageText !== 'string') return false;
+  const plainExcerpt = normalizeExcerptText(excerpt);
+  // Do not accept excerpts made of only punctuation/whitespace.
+  if (plainExcerpt.replace(/\s/g, '').length < 8) return false;
+  return normalizeExcerptText(pageText).includes(plainExcerpt) ||
+    normalizeExcerptText(pageText, true).includes(normalizeExcerptText(excerpt, true));
+}
+// Validate excerpts against the matching PAGE N text in ordinary API prompts.
 function quotedInSource(prompt, page, excerpt) {
   if (typeof prompt !== 'string') return true;
   const marker = /^PAGE (\d+):\s*/gm;
   const spans = [...prompt.matchAll(marker)];
   if (!spans.length) return true; // Legacy API calls without page-formatted source.
-  const normalize = value => String(value).replace(/\s+/g, ' ').trim().toLowerCase();
   for (let i = 0; i < spans.length; i++) {
     if (Number(spans[i][1]) !== page) continue;
     const start = spans[i].index + spans[i][0].length;
     const end = i + 1 < spans.length ? spans[i + 1].index : prompt.length;
-    if (normalize(prompt.slice(start, end)).includes(normalize(excerpt))) return true;
+    if (sourceExcerptOnPage(prompt.slice(start, end), excerpt)) return true;
   }
   return false;
 }
 
-function parseFlashcards(raw, requestedType = null, prompt = null) {
+function parseFlashcards(raw, requestedType = null, prompt = null, sourcePages = null) {
   let value = raw;
   if (typeof value === 'string') {
     const text = value.trim().replace(/^```(?:json)?\s*/i, '').replace(/```\s*$/, '').trim();
@@ -170,6 +191,9 @@ function parseFlashcards(raw, requestedType = null, prompt = null) {
     : Array.isArray(value?.cards) ? value.cards : null;
   if (!list?.length) throw new AIError('Provider returned no flashcards.', 502);
 
+  // Background jobs validate against the full PDF, not just the five-page prompt window.
+  const pagesByNumber = Array.isArray(sourcePages)
+    ? new Map(sourcePages.map(p => [p.page, p.text])) : null;
   const reasons = { format: 0, type: 0, answer: 0, source: 0 };
   const valid = [];
   const aliases = {
@@ -189,7 +213,10 @@ function parseFlashcards(raw, requestedType = null, prompt = null) {
     if (!question || !Number.isInteger(page) || page < 1 || !Array.isArray(choices)) {
       reasons.format++; continue;
     }
-    if (excerpt.length < 10 || excerpt.length > 160 || !quotedInSource(prompt, page, excerpt)) {
+    const excerptValid = pagesByNumber
+      ? sourceExcerptOnPage(pagesByNumber.get(page), excerpt)
+      : quotedInSource(prompt, page, excerpt);
+    if (excerpt.length < 10 || excerpt.length > 160 || !excerptValid) {
       reasons.source++; continue;
     }
     let answer = input.answer ?? input.a;
@@ -216,7 +243,7 @@ function parseFlashcards(raw, requestedType = null, prompt = null) {
     }
     valid.push({ type, question, answer, choices, page, source_excerpt: excerpt });
   }
-
+  // Only aggregate diagnostics: never print student PDF text, questions, or keys.
   if (valid.length < list.length) {
     console.warn(`[TraceCard AI] Provider validation: ${valid.length}/${list.length} accepted; rejected=${JSON.stringify(reasons)}`);
   }
@@ -367,7 +394,7 @@ function recordFailure(provider, error) {
   console.warn(`[TraceCard AI] ${provider.id} failed: ${status || 'network/format error'}`);
 }
 
-async function generateFlashcards(prompt, requestedType = 'mcq', signal = null) {
+async function generateFlashcards(prompt, requestedType = 'mcq', signal = null, sourcePages = null) {
   const schema = buildResponseSchema(requestedType);
   let tried = 0;
   for (const provider of PROVIDERS) {
@@ -380,7 +407,7 @@ async function generateFlashcards(prompt, requestedType = 'mcq', signal = null) 
       const raw = provider.id === 'gemini'
         ? await askGemini(provider, prompt, schema, signal)
         : await askChatCompletion(provider, prompt, schema, signal);
-      const cards = parseFlashcards(raw, requestedType, prompt);
+      const cards = parseFlashcards(raw, requestedType, prompt, sourcePages);
       console.info(`[TraceCard AI] ${provider.id}: ${cards.length} valid ${requestedType} cards in ${Date.now()-startedAt}ms`);
       return cards;
     } catch (error) {
@@ -436,6 +463,9 @@ async function handleGenerate(req, res) {
 app.post('/api/gemini', handleGenerate);
 app.post('/api/flashcards', handleGenerate);
 
+// Durable background-generation jobs. Requires UPSTASH_REDIS_REST_URL +
+// UPSTASH_REDIS_REST_TOKEN. No client PDF binary or provider keys are stored.
+// The job ID is a secret bearer capability. Keep it out of URLs and logs.
 const crypto = require('crypto');
 const REDIS_URL = (process.env.UPSTASH_REDIS_REST_URL || '').trim().replace(/\/$/, '');
 const REDIS_TOKEN = (process.env.UPSTASH_REDIS_REST_TOKEN || '').trim();
@@ -448,6 +478,8 @@ const BG_LEASE_SECONDS = Math.ceil(PROVIDER_TIMEOUT_MS / 1000) * Math.max(1,PROV
 const BG_CONCURRENCY = boundedInteger('BG_CONCURRENCY', 2, 1, 5);
 const BG_MAX_SOURCE_CHARS = boundedInteger('BG_MAX_SOURCE_CHARS', 120000, 10000, 250000);
 const BG_POLL_MS = boundedInteger('BG_POLL_MS', 3500, 2000, 15000);
+const BG_MAX_ATTEMPTS_PER_SET = boundedInteger('BG_MAX_ATTEMPTS_PER_SET', 6, 1, 20);
+const BG_MAX_STALLS = boundedInteger('BG_MAX_STALLS', 3, 1, 15);
 let bgActive = 0;
 let bgTimer = null;
 let bgTickRunning = false;
@@ -502,7 +534,7 @@ async function bgSaveClaimed(job, token, nextRunAt) {
   const result = await bgRedis('EVAL', BG_SAVE_SCRIPT, 4,
     bgKey(job.id), bgLockKey(job.id), BG_DUE_KEY, bgCancelKey(job.id),
     token, JSON.stringify(job), BG_TTL_SECONDS, done ? 'done' : 'due', job.id, nextRunAt);
-  if (Number(result) === 2) return; 
+  if (Number(result) === 2) return;
   if (Number(result) !== 1) throw new AIError('Background job lease expired; will recover from checkpoint.', 503);
 }
 async function bgUnlock(id, token) {
@@ -534,7 +566,12 @@ function bgNextType(set, counts) {
   return Object.keys(counts).find(t => set.cards.filter(c => c.type === t).length < counts[t]);
 }
 function bgBadQuestion(q) {
-  return /\b(?:page|slide|section|chapter|unit)\s*(?:no\.?\s*|number\s*|#\s*)?\d+\b|\b(?:pdf|this document|the document|this lecture|the lecture|this module|the module|the handout|uploaded file|source text)\b|\b(?:according to|as stated in|as shown in|listed under|listed on|found on|mentioned in|taken from|based on the)\b|\b(?:who (?:wrote|authored|prepared|owns|published)|who (?:is|was) the (?:author|owner|instructor|professor|publisher)|(?:name|identify) the (?:author|owner|instructor|professor|publisher)|copyright|all rights reserved|prepared by|submitted by|written by)\b/i.test(q);
+  const question = String(q || '');
+
+  return /\b(?:page|slide)\s*(?:no\.?\s*|number\s*|#\s*)?\d+\b/i.test(question) ||
+    /\b(?:this|the|uploaded|provided)\s+(?:pdf|document|file|slides?|lecture|module|handout)\b/i.test(question) ||
+    /\b(?:in|on|from|of|according to|as (?:shown|stated|described) in|based on)\s+(?:(?:the|this|provided|uploaded)\s+)?(?:pages?|slides?|pdf|document|file|source text)\b/i.test(question) ||
+    /\b(?:who (?:wrote|authored|prepared|published)|(?:name|identify) the (?:author|owner|instructor|professor|publisher)|copyright|all rights reserved|prepared by|submitted by|written by)\b/i.test(question);
 }
 function bgPrompt(job, set, wanted, count) {
   const skip = set.attempts || 0;
@@ -554,12 +591,12 @@ function bgPrompt(job, set, wanted, count) {
     `Avoid these already-generated questions: ${JSON.stringify(avoided)}\n` +
     source;
 }
-function bgVerifyCard(card, job, chosenPages, used) {
+function bgVerifyCard(card, job, used) {
   if (bgBadQuestion(card.question) || used.has(card.question.trim().toLowerCase())) return false;
+  if (!Number.isInteger(card.page) || card.page < 1) return false;
   const sourcePage = job.pages.find(p => p.page === card.page);
-  if (!sourcePage || !chosenPages.includes(card.page)) return false;
-  const norm = s => String(s).replace(/\s+/g, ' ').trim().toLowerCase();
-  return norm(sourcePage.text).includes(norm(card.source_excerpt));
+
+  return Boolean(sourcePage && sourceExcerptOnPage(sourcePage.text, card.source_excerpt));
 }
 async function bgProcessBatch(job, signal = null) {
   const set = job.sets.find(s => s.status !== 'completed');
@@ -573,17 +610,15 @@ async function bgProcessBatch(job, signal = null) {
   }
 
   const want = Math.min(10, quota[type] - set.cards.filter(c => c.type === type).length);
-  const selection = Array.from({ length: Math.min(5, job.pages.length) }, (_, i) =>
-    job.pages[(set.setNumber * 3 + (set.attempts || 0) * 5 + i) % job.pages.length].page);
   const prompt = bgPrompt(job, set, type, want);
   set.attempts++;
-  const batch = await queueTask(() => generateFlashcards(prompt, type, signal));
+  const batch = await queueTask(() => generateFlashcards(prompt, type, signal, job.pages));
   const used = new Set(job.sets.flatMap(s => s.cards.map(c => c.question.trim().toLowerCase())));
   let added = 0;
   for (const card of batch) {
     if (set.cards.length >= job.cardsPerSet) break;
     if (set.cards.filter(c => c.type === type).length >= quota[type]) break;
-    if (!bgVerifyCard(card, job, selection, used)) continue;
+    if (!bgVerifyCard(card, job, used)) continue;
     set.cards.push(card);
     used.add(card.question.trim().toLowerCase());
     added++;
@@ -594,6 +629,11 @@ async function bgProcessBatch(job, signal = null) {
     job.message = 'All flashcards generated.';
   } else job.status = 'running';
   return added;
+}
+function bgRetryLimitReached(job) {
+  const currentSet = job.sets.find(s => s.status !== 'completed');
+  return (job.stalls || 0) >= BG_MAX_STALLS ||
+    Boolean(currentSet && currentSet.attempts >= BG_MAX_ATTEMPTS_PER_SET);
 }
 async function bgRunOneJob(id) {
   const token = crypto.randomBytes(20).toString('hex');
@@ -613,20 +653,21 @@ async function bgRunOneJob(id) {
     try {
       const added = await bgProcessBatch(job, aborter.signal);
       job.failures = 0;
-      job.stalls = added > 0 ? 0 : (job.stalls || 0) + 1;
-      const attempts = job.sets.reduce((n,s) => n+s.attempts,0);
-      if (job.stalls >= 8 || attempts >= 100) {
-        job.status = 'failed';
-        job.message = 'Generation stopped because the AI could not produce enough valid, unique source-linked cards.';
+      if (job.status === 'running') {
+        job.stalls = added > 0 ? 0 : (job.stalls || 0) + 1;
+        if (bgRetryLimitReached(job)) {
+          job.status = 'failed';
+          job.message = 'Generation stopped after reaching the retry limit. Completed sets are saved; incomplete sets are not shown.';
+        }
       }
 
     } catch (e) {
       job.failures = (job.failures || 0) + 1;
       const delay = Math.min(180000, 10000 * 2 ** Math.min(job.failures - 1, 5));
       nextRunAt = Date.now() + delay;
-      if (job.failures >= 9) {
+      if (job.failures >= BG_MAX_ATTEMPTS_PER_SET || bgRetryLimitReached(job)) {
         job.status = 'failed';
-        job.message = 'The AI providers remained unavailable. Completed sets have been saved.';
+        job.message = 'Generation stopped after repeated AI failures. Completed sets are saved; incomplete sets are not shown.';
       }
       console.warn(`[TraceCard AI] Background batch failed (${e?.status || 'provider'}); retry ${job.failures}`);
     }
@@ -723,7 +764,7 @@ app.post('/api/generation-jobs', async (req, res) => {
     const script = `redis.call('SET', KEYS[1], ARGV[1], 'EX', ARGV[2]); redis.call('ZADD', KEYS[2], ARGV[3], ARGV[4]); return 1`;
     await bgRedis('EVAL', script, 2, bgKey(id), BG_DUE_KEY,
       JSON.stringify(job), BG_TTL_SECONDS, Date.now(), id);
-   
+
     res.status(202).json(bgPublic(job));
     void bgTick();
   } catch (e) {
@@ -761,7 +802,7 @@ app.post('/api/generation-jobs/:jobId/cancel', async (req, res) => {
     const result = await bgRedis('EVAL', BG_CANCEL_SCRIPT, 3,
       bgKey(id), BG_DUE_KEY, bgCancelKey(id), BG_TTL_SECONDS, id, Date.now());
     if (Number(result) === 0) return res.status(404).json({error:'Job not found on this server/Redis instance. Verify Vercel server deployment and UPSTASH_REDIS_REST_URL.'});
-   
+
     if (Number(result) === 1 || Number(result) === 3) bgRunningControllers.get(id)?.abort();
     const job = await bgGet(id);
     if (!job) return res.status(404).json({error:'Job not found or expired.'});
@@ -813,4 +854,4 @@ Object.assign(module.exports, {
   app, parseFlashcards, extractGeminiText,
   generateFlashcards, buildResponseSchema, requestedCardType,
 });
-if (process.env.NODE_ENV === 'test') module.exports.__test = {bgTick, bgGet, bgValidateRequest, bgRunOneJob};
+if (process.env.NODE_ENV === 'test') module.exports.__test = {bgTick, bgGet, bgValidateRequest, bgRunOneJob, bgBadQuestion, bgVerifyCard, sourceExcerptOnPage, bgRetryLimitReached};
