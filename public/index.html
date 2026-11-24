@@ -3078,6 +3078,16 @@ body[data-theme="dark"] #settings button.tc-setting-switch[aria-checked="true"]:
 #settings > .page-heading { align-items: center; }
 </style>
 <style id="tc-empty-generation-messages">#info:empty,#uploadSummary:empty,#tcGenProgressNote:empty{display:none!important}</style>
+
+<style id="tc-review-previous-navigation-style">
+.tc-review-navigation{display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap;margin:0 0 12px}
+.tc-review-navigation button{display:inline-flex;align-items:center;justify-content:center;gap:7px;padding:10px 14px;border:1px solid #d6e5f0;border-radius:10px;background:#eaf7ff;color:#176da4;font:inherit;font-size:13px;font-weight:700;cursor:pointer;min-height:42px}
+.tc-review-navigation button:disabled{opacity:.45;cursor:default}
+.tc-review-navigation .tc-review-next{margin-left:auto}
+.tc-reviewed-question .tc-review-flip-heading{margin:0 0 12px}
+body[data-theme="dark"] .tc-review-navigation button{background:#173650;color:#b6dfff;border-color:#355377}
+@media(max-width:480px){.tc-review-navigation{gap:6px}.tc-review-navigation button{padding:8px 10px;font-size:12px}}
+</style>
 </head>
 <body data-theme="light">
 
@@ -3142,11 +3152,11 @@ body[data-theme="dark"] #settings button.tc-setting-switch[aria-checked="true"]:
     </div>
     <div class="tc-gen-field tc-gen-field--sets">
      <span class="tc-gen-label" id="count-label">Sets</span>
-     <select id="count" aria-labelledby="count-label"><option>1</option><option selected>2</option><option>3</option><option>4</option><option>5</option></select>
+     <select id="count" aria-labelledby="count-label"><option selected>1</option><option>2</option><option>3</option><option>4</option><option>5</option></select>
     </div>
     <div class="tc-gen-field tc-gen-field--cards">
      <span class="tc-gen-label" id="cardAmount-label">Cards per set</span>
-     <select id="cardAmount" aria-labelledby="cardAmount-label"><option>10</option><option selected>20</option><option>30</option></select>
+     <select id="cardAmount" aria-labelledby="cardAmount-label"><option selected>10</option><option>20</option><option>30</option></select>
     </div>
    </div><div class="generate-actions"><button id="make" class="btn-primary" disabled>Generate Flashcards</button><button id="cancelGeneration" class="btn-secondary tc-cancel-generation" type="button" hidden disabled aria-label="Cancel current flashcard generation">Cancel Generation</button></div><p id="info" role="status">No PDF selected.</p><div id="tcGenProgress" class="tc-gen-progress" hidden aria-live="polite">
  <div class="tc-gen-progress-header"><strong id="tcGenProgressTitle">Flashcard Generation:</strong><span id="tcGenProgressCount">0 of 20 saved</span></div>
@@ -3427,6 +3437,87 @@ function tcReviewCategoryBase(word){
  if(term==='colour')term='color';
  return term;
 }
+// Accept ordinary English inflections and tightly bounded typing mistakes,
+// not broad edit-distance matches (e.g. agonist vs antagonist, ileum vs ilium).
+const tcReviewIrregularForms=[
+ ['analysis','analyses'],['diagnosis','diagnoses'],['hypothesis','hypotheses'],
+ ['crisis','crises'],['thesis','theses'],['axis','axes'],['basis','bases'],
+ ['bacterium','bacteria'],['criterion','criteria'],['phenomenon','phenomena'],
+ ['nucleus','nuclei'],['fungus','fungi'],['vertebra','vertebrae'],
+ ['child','children'],['person','people'],['tooth','teeth'],['foot','feet'],
+ ['mouse','mice'],['leaf','leaves'],['life','lives'],['knife','knives']
+];
+const tcReviewSpellingForms=[
+ ['color','colour'],['colors','colours'],['behavior','behaviour'],['behaviors','behaviours'],
+ ['organization','organisation'],['organizations','organisations'],
+ ['organize','organise'],['organized','organised'],['recognize','recognise'],
+ ['analyze','analyse'],['analyzed','analysed'],['center','centre'],['centers','centres'],
+ ['fiber','fibre'],['fibers','fibres'],['defense','defence'],['offense','offence'],
+ ['anemia','anaemia'],['hemoglobin','haemoglobin'],['estrogen','oestrogen'],
+ ['edema','oedema'],['esophagus','oesophagus'],['tumor','tumour']
+];
+const tcReviewProtectedNouns=new Set([
+ 'species','series','news','physics','mathematics','economics','ethics','politics',
+ 'statistics','mechanics','genetics','electronics','diabetes','measles','rabies',
+ 'gas','as','is','was','has','this','his','its','us','ours','yours','theirs',
+ 'status','virus','census','corpus','focus','bonus','campus','sinus','thrombus',
+ 'analysis','diagnosis','hypothesis','crisis','thesis','axis','basis','lens','means',
+ 'mass','class','glass','process','business','address','stress','access','success',
+ 'versus','minus','plus','alias','bias','atlas','canvas','chaos','cosmos','mucus',
+ 'synapsis','synapse','metastasis','stasis','sepsis','synthesis','osmosis'
+]);
+function tcReviewPluralOf(singular,plural){
+ if(!/^[a-z]{3,}$/.test(singular)||!(/^[a-z]+$/).test(plural))return false;
+ if(tcReviewIrregularForms.some(pair=>pair[0]===singular&&pair[1]===plural))return true;
+ // A regular plural must be derived from the whole word, not an arbitrary stem.
+ if(/[^aeiou]y$/.test(singular))return plural===singular.slice(0,-1)+'ies';
+ if(/(?:s|x|z|ch|sh)$/.test(singular)){
+  if(['species','series','news','physics','mathematics','economics','ethics','politics','statistics','mechanics','genetics','electronics','diabetes','measles','rabies'].includes(singular))return false;
+  return plural===singular+'es';
+ }
+ if(tcReviewProtectedNouns.has(plural))return false;
+ return plural===singular+'s';
+}
+function tcReviewWordVariant(a,b,allowInflection){
+ if(a===b)return 'exact';
+ const canonical=word=>tcReviewSpellingForms.find(pair=>pair.includes(word))?.[0]||word;
+ const ca=canonical(a),cb=canonical(b);
+ if(ca===cb)return 'spelling';
+ if(allowInflection&&(tcReviewPluralOf(ca,cb)||tcReviewPluralOf(cb,ca)))return 'plural';
+ // Only one adjacent transposition in a long word, or one duplicated letter.
+ // No arbitrary single-letter substitutions, missing letters, or prefix matching.
+ if(!/^[a-z]{7,}$/.test(a)||!(/^[a-z]{7,}$/).test(b))return '';
+ if(a.length===b.length){
+  const diff=[];for(let i=0;i<a.length;i++)if(a[i]!==b[i])diff.push(i);
+  if(diff.length===2&&diff[1]===diff[0]+1&&a[diff[0]]===b[diff[1]]&&a[diff[1]]===b[diff[0]])return 'typo';
+ }else if(a.length===b.length+1){
+  for(let i=1;i<a.length;i++)if(a[i]===a[i-1]&&a.slice(0,i)+a.slice(i+1)===b)return 'typo';
+ }
+ return '';
+}
+function tcReviewTextVariant(actual,target,question){
+ // Do not apply word-level leniency to formulas, codes, numeric answers or symbols.
+ const plain=/^[\p{L}\p{M}\s\u2010-\u2015\-]+[.!?]?$/u;
+ const a=actual.normalize('NFKC').toLocaleLowerCase(),b=target.normalize('NFKC').toLocaleLowerCase();
+ if(!plain.test(a)||!plain.test(b))return '';
+ const aw=a.match(/[\p{L}\p{M}]+/gu)||[],bw=b.match(/[\p{L}\p{M}]+/gu)||[];
+ if(!aw.length||aw.length!==bw.length)return '';
+ const q=String(question??'');
+ // A grammar question asking for the singular/plural form needs that exact form.
+ const allowInflection=!/\b(?:singular|plural|inflect(?:ion|ed)?|grammatical number)\b/i.test(q);
+ let plural=false,spelling=false,typos=0;
+ for(let i=0;i<aw.length;i++){
+  const kind=tcReviewWordVariant(aw[i],bw[i],allowInflection);
+  if(!kind)return '';
+  if(kind==='plural')plural=true;
+  if(kind==='spelling')spelling=true;
+  if(kind==='typo'&&++typos>1)return '';
+ }
+ if(typos)return 'Minor typing variation accepted.';
+ if(plural)return 'Singular/plural variation accepted.';
+ if(spelling)return 'Equivalent spelling accepted.';
+ return '';
+}
 function tcEquivalentReviewAnswer(given,expected,question=''){
  const actual=String(given??'').trim(),target=String(expected??'').trim();
  if(!actual||!target)return {correct:false,note:''};
@@ -3437,6 +3528,8 @@ function tcEquivalentReviewAnswer(given,expected,question=''){
  if(actualKey&&actualKey===expectedKey){
   return {correct:true,note:actual.toLocaleLowerCase()===target.toLocaleLowerCase()?'':'Equivalent formatting accepted.'};
  }
+ const variation=tcReviewTextVariant(actual,target,question);
+ if(variation)return {correct:true,note:variation};
  // One final category noun can be redundant when the question asks for that
  // category. E.g. 'primary' for 'primary colors' in a question about colors;
  // 'sodium-potassium' for 'sodium-potassium pump' in a question about a pump.
@@ -3445,7 +3538,8 @@ function tcEquivalentReviewAnswer(given,expected,question=''){
   'color','pump','process','system','theory','law','principle','method',
   'model','mechanism','reaction','enzyme','organ','organelle','structure',
   'protocol','algorithm','shape','pattern','category','classification',
-  'type','group','layer','stage','phase','cycle','wave'
+  'type','group','layer','stage','phase','cycle','wave',
+  'form','tense','voice','mood'
  ]);
  const words=target.match(/[\p{L}]+/gu)||[];
  const finalWord=words.length>1?words[words.length-1].toLocaleLowerCase():'';
@@ -3461,7 +3555,15 @@ function tcEquivalentReviewAnswer(given,expected,question=''){
   const categoryAsked=qWords.includes(category)||impliedColorTopic;
   const withoutCategory=target.replace(/\s+[\p{L}]+\s*[.!?]?$/u,'').trim();
   const shortKey=tcAnswerCompact(withoutCategory);
-  if(categoryAsked&&shortKey.length>=3&&shortKey===actualKey){
+  // If the question requires a full or exact term, do not drop a category word.
+  const requiresFullTerm=/\b(?:full form|full name|full term|complete name|complete term|exact name|exact term|exact wording|spell out|write in full|stand for|stands for)\b/i.test(q);
+  // Compare whole words rather than joined text when accepting a shorter answer.
+  // Only the final, question-supplied category may be omitted; all other words
+  // must match (or be a previously supported spelling/inflection variant).
+  const shortTokens=value=>String(value).normalize('NFKC').toLocaleLowerCase().match(/[\p{L}\p{M}\p{N}]+/gu)||[];
+  const sameShortWords=/^[\p{L}\p{M}\p{N}\s\u2010-\u2015\-]+[.!?]?$/u.test(actual)&&/^[\p{L}\p{M}\p{N}\s\u2010-\u2015\-]+[.!?]?$/u.test(withoutCategory)&&JSON.stringify(shortTokens(actual))===JSON.stringify(shortTokens(withoutCategory));
+  const shortVariation=tcReviewTextVariant(actual,withoutCategory,question);
+  if(categoryAsked&&!requiresFullTerm&&shortKey.length>=3&&(sameShortWords||shortVariation)){
    return {correct:true,note:`Accepted: “${finalWord}” was already indicated in the question.`};
   }
  }
@@ -4261,7 +4363,7 @@ function tcBgStopPolling(){if(tcBgPollTimer){clearInterval(tcBgPollTimer);tcBgPo
 function tcBgStartPolling(){
  if(tcBgPollTimer)return;
  tcBgPollTimer=setInterval(()=>{
-  if(document.visibilityState==='visible'&&tcBgGet())tcBgCheckStatus();
+  if(tcBgGet())tcBgCheckStatus();
  },5000);
 }
 // Randomize MCQ option positions when accepting new cards (not while reviewing).
@@ -4379,8 +4481,8 @@ async function tcBgCheckStatus(){
    $('info').textContent='Background job stopped. Completed sets have been kept.';
    tcBgStopPolling();tcBgBusy(false);return;
   }
-  tcProgressDisplay(saved,total,'working',`${status==='queued'?'Waiting in server queue':'Generating on the server'} — you can leave this website and return later.`);
-  tcBgAlert('Background generation in progress',`${saved} of ${total} cards saved on the server. You can open another app or close this browser tab.`,true);
+  tcProgressDisplay(saved,total,'working',`${status==='queued'?'Waiting in server queue':'Generating on the server'} — you can switch tabs and return.`);
+  tcBgAlert('Background generation in progress',`${saved} of ${total} cards saved on the server. You can switch tabs. Keep this website open until generation finishes.`,true);
   tcBgBusy(true);tcBgStartPolling();
   if(imported)$('info').textContent=`${imported} completed set(s) added from your background job.`;
  }catch(err){
@@ -4425,7 +4527,7 @@ async function tcTryStartBackgroundGeneration(){
   job={id:jobId,pdfName:fileName,sets,cardsPerSet,questionType,startedAt:Date.now()};
   tcBgRemember(job);
   tcBgStarting=false;tcUpdateCancelButton();
-  tcBgAlert('Background generation started',`Job created for ${sets*cardsPerSet} flashcards. You can now safely switch apps or close the tab.`,true);
+  tcBgAlert('Background generation started',`Job created for ${sets*cardsPerSet} flashcards. You can switch tabs after the job starts. Keep this website open until generation finishes.`,true);
   $('info').textContent='Background generation started. Your progress is saved on the server.';
   await tcBgCheckStatus();
  }catch(err){
@@ -4438,6 +4540,7 @@ async function tcTryStartBackgroundGeneration(){
 $('tcBgRefresh').onclick=()=>tcBgCheckStatus();
 document.addEventListener('visibilitychange',()=>{if(!document.hidden&&tcBgGet())tcBgCheckStatus();});
 window.addEventListener('pageshow',()=>{if(tcBgGet())tcBgCheckStatus();});
+window.addEventListener('online',()=>{if(tcBgGet())tcBgCheckStatus();});
 function tcBgRestoreAfterLoad(){
  const job=tcBgGet();if(!job)return;
  tcBgAlert('Checking saved background job',`Looking up the generation for ${job.pdfName}...`,true);
@@ -4832,6 +4935,7 @@ function approveAll(deck){
 
  save();
  show('review');
+ tcShowApprovalToast(list.length===1?'Flashcard approved and saved!':'Flashcards approved and saved!', 'approved');
 }
 
 function edit(id){
@@ -5038,6 +5142,48 @@ function tcProofUpdatePanel(){
 }
 window.addEventListener('online',()=>{tcProofSync(session?.tcProof,true);if(tcProofPending!==session?.tcProof)tcProofSync(tcProofPending,true);});
 let tcReviewCompletionAnimationPending=false;
+function tcRatedReviewEntries(){
+ if(!session)return [];
+ return session.ids.slice(0,session.index).map((id,index)=>{
+  const card=tcFindReviewCard(id);
+  const result=session.tcRated?.[id]||logs.find(l=>l.cardId===id&&l.deck===card?.deck&&l.correct===session.results?.[id]);
+  return card&&card.status==='approved'&&typeof session.results?.[id]==='boolean'&&result?{id,index,card,result}:null;
+ }).filter(Boolean);
+}
+function tcReviewNavMarkup(previous,nextLabel=''){
+ return `<div class="tc-review-navigation" aria-label="Review question navigation">
+  <button type="button" class="tc-review-prev" ${previous?'':'disabled'} onclick="tcReviewMove(-1)"><span aria-hidden="true">←</span> Previous Question</button>
+  ${nextLabel?`<button type="button" class="tc-review-next" onclick="tcReviewMove(1)">${nextLabel} <span aria-hidden="true">→</span></button>`:''}
+ </div>`;
+}
+function tcReviewMove(direction){
+ if(!session)return;
+ const entries=tcRatedReviewEntries();
+ const current=entries.findIndex(e=>e.id===session.tcBrowseId);
+ const target=(current<0?entries.length:current)+direction;
+ if(target<0||target>entries.length)return;
+ if(target===entries.length)delete session.tcBrowseId;
+ else session.tcBrowseId=entries[target].id;
+ saveSessionOnly();drawReview();
+}
+function tcDrawRatedReview(entry,entries){
+ const {card,result,index}=entry;
+ const position=entries.findIndex(e=>e.id===entry.id);
+ const nextLabel=position===entries.length-1?(session.index>=session.ids.length?'Back to Results':'Next Question'):'Next Question';
+ const shownAnswer=result.userAnswer??result.answer??'';
+ const question=result.q??card.q;
+ const correctAnswer=result.correctAnswer??card.a;
+ $('quiz').innerHTML=reviewProgressMarkup()+tcReviewNavMarkup(position>0,nextLabel)+`<div class="box tc-review-card tc-reviewed-question">
+ <p><small><b>${safe(card.name)}</b> | Question ${index+1}/${session.ids.length}</small></p>
+ <h3>${safe(question)}</h3>
+ <div class="tc-review-flip-heading"><span class="tc-review-result-pill ${result.correct?'':'is-wrong'}">${result.correct?'✓ Correct!':'✕ Incorrect'}</span></div>
+ <div class="tc-review-answer-panel your-answer"><strong>Your answer</strong><p>${safe(shownAnswer)}</p></div>
+ <div class="tc-review-answer-panel"><strong>Correct answer</strong><p>${safe(correctAnswer)}</p></div>
+ ${result.rating?`<p class="tc-review-keyboard-hint">Recall rating: ${safe(result.rating)}</p>`:''}
+ <button type="button" id="tcPreviousReviewSource">View Source - Page ${safe(card.page)}</button>
+ <p class="tc-review-keyboard-hint">Already reviewed. Your answer and schedule are saved.</p></div>`;
+ $('tcPreviousReviewSource').onclick=()=>viewSource(card.id);
+}
 function drawReview(){
  if(!session){
   const first=due()[0];
@@ -5056,13 +5202,17 @@ function drawReview(){
   ))break;
   session.index++;
  }
+ const ratedEntries=tcRatedReviewEntries();
+ const browsing=ratedEntries.find(e=>e.id===session.tcBrowseId);
+ if(browsing){tcDrawRatedReview(browsing,ratedEntries);return;}
+ if(session.tcBrowseId){delete session.tcBrowseId;saveSessionOnly();}
  if(session.index>=session.ids.length){
   const nextDates=tcReviewCards().filter(c=>c.deck===session.deck&&c.status==='approved'&&c.next).map(c=>new Date(c.next).getTime()).filter(Number.isFinite);
   const next=nextDates.length?new Date(Math.min(...nextDates)):null;
   const correctCount=Object.values(session.results||{}).filter(x=>x===true).length;
   const animate=tcReviewCompletionAnimationPending;
   tcReviewCompletionAnimationPending=false;
-  $('quiz').innerHTML=reviewProgressMarkup()+`<div class="box ${animate?'tc-review-completed':''}">
+  $('quiz').innerHTML=reviewProgressMarkup()+tcReviewNavMarkup(ratedEntries.length>0)+`<div class="box ${animate?'tc-review-completed':''}">
    ${animate?'<div class="tc-review-complete-animation"><span class="tc-review-complete-check" aria-hidden="true">✓</span><span>Review completed!</span></div>':''}
    <h3>Set Review Complete!</h3><p><b>${correctCount}/${session.ids.length} correct</b> · ${session.ids.length} questions reviewed.</p>
    ${next?`<p><b>Next Review:</b> ${safe(formatDate(next))}</p>`:''}
@@ -5088,7 +5238,7 @@ function drawReview(){
   <button type="button" id="tcReviewSourceButton">View Source - Page ${safe(c.page)}</button>
   <p class="tc-review-recall">Rate your recall to continue:</p>
   <div class="actions">${[['Difficult',1],['Partially Remembered',3],['Remembered',7]].map(([r,d])=>`<button type="button" class="tc-review-rate" data-rating="${r}" data-days="${d}">${r}</button>`).join('')}</div>`;
- $('quiz').innerHTML=reviewProgressMarkup()+`<div class="box tc-review-card"><div class="tc-review-flip-stage"><div id="tcReviewFlip" class="tc-review-flip-inner">
+ $('quiz').innerHTML=reviewProgressMarkup()+tcReviewNavMarkup(ratedEntries.length>0)+`<div class="box tc-review-card"><div class="tc-review-flip-stage"><div id="tcReviewFlip" class="tc-review-flip-inner">
   <div class="tc-review-face tc-review-face-front" aria-hidden="false"><p><small><b>${safe(c.name)}</b> | Question ${session.index+1}/${session.ids.length}</small></p><h3>${safe(c.q)}</h3>${fields}<button type="button" id="check">Check Answer</button>${type==='enumeration'?'':'<p class="tc-review-keyboard-hint">Press Enter to check your answer.</p>'}</div>
   <div class="tc-review-face tc-review-face-back" aria-hidden="true" inert>${answerBack}</div>
  </div></div></div>`;
@@ -5179,10 +5329,12 @@ function drawReview(){
 }
 function saveSessionOnly(){tcStore.setItem(key+'session',JSON.stringify(session));}
 function rate(id,rating,days){
- const c=tcFindReviewCard(id);if(!c||!session||session.ids[session.index]!==id)return;
+ const c=tcFindReviewCard(id);if(!c||!session||session.tcBrowseId||session.ids[session.index]!==id)return;
  const answered=session.answers?.[id];if(!answered?.checked)return;
  const now=new Date(),next=new Date(now);next.setDate(next.getDate()+days);c.next=next.toISOString();
- logs.unshift({cardId:c.id,deck:c.deck,q:c.q,opts:[...(c.opts||[])],type:cardType(c),correctAnswer:c.a,userAnswer:answered.answer,rating,correct:answered.correct,date:now.toISOString(),next:c.next});
+ const rated={cardId:c.id,deck:c.deck,q:c.q,opts:[...(c.opts||[])],type:cardType(c),correctAnswer:c.a,userAnswer:answered.answer,rating,correct:answered.correct,date:now.toISOString(),next:c.next};
+ logs.unshift(rated);
+ session.tcRated=session.tcRated||{};session.tcRated[id]=rated;
  session.results=session.results||{};
  session.results[id]=answered.correct;
  tcProofRecord(c,answered,rating);
