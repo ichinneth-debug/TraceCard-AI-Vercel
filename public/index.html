@@ -4918,7 +4918,7 @@ function drawHistory(){
  const hasRecordedAnswers=logs.length>0||Boolean(session&&Object.keys(session.answers||{}).length);
  if(!hasRecordedAnswers){
   historyDeck='';historyCard='';historyFilter='all';historySearchOrigin=false;
-  content.innerHTML='<p style="margin:0;font-weight:700">No review history yet.</p>';
+  content.textContent='No review history yet.';
   return;
  }
  if(historySearchQuery&&!historyDeck){drawHistoryGlobalSearch(historyCards);return;}
