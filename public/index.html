@@ -2905,6 +2905,25 @@ body[data-theme="dark"] #tcCardDialog #tcCardModalError{color:#ffacb7!important}
 #tcCardDialog [hidden]{display:none!important}
 @media(max-width:480px){#tcCardDialog .tc-card-modal-actions button{flex:1;padding:11px 8px}#tcCardDialog h2{font-size:19px}}
 </style>
+<style id="tc-history-set-format">
+#historyContent .history-row{justify-content:flex-start;align-items:center;gap:20px;}
+#historyContent .history-row .history-score{flex:0 0 auto;white-space:nowrap;text-align:right;min-width:48px;}
+#historyContent .tc-history-set-meta{display:flex;flex-direction:column;gap:3px;min-width:0;flex:1;}
+#historyContent .tc-history-pdf-title{font-weight:700;overflow-wrap:anywhere;}
+#historyContent .tc-history-set-number{font-size:14px;font-weight:500;}
+#historyContent .tc-history-set-date{font-size:13px;font-weight:400;color:var(--tc-body,var(--muted));}
+#historyContent .tc-history-set-arrow{flex:0 0 auto;color:inherit;}
+@media(max-width:520px){#historyContent .history-row{gap:12px;padding:16px;}#historyContent .history-row .history-score{min-width:40px;font-size:17px;}#historyContent .tc-history-set-number{font-size:13px;}#historyContent .tc-history-set-date{font-size:12px;}}
+</style>
+<style id="tc-rated-review-notifications">
+#tcGeneratedReadyBell .tc-ready-pdf-title{font-weight:700;overflow-wrap:anywhere;max-width:100%;white-space:normal;}
+#bellMessage .tc-bell-rating-heading{margin:9px 0 1px;padding:0 2px;font:inherit;font-size:13px;font-weight:750;line-height:1.4;color:#18294d;flex-shrink:0;}
+#bellMessage .tc-bell-rating-heading:first-child{margin-top:1px;}
+body[data-theme="dark"] #bellMessage .tc-bell-rating-heading{color:#e8efff;}
+#bellMessage .tc-bell-row{flex-shrink:0;}
+.tc-calendar-footer{margin-top:12px;padding-top:9px;}
+.tc-calendar-footer p{margin:0;}
+</style>
 </head>
 <body data-theme="light">
 
@@ -2922,7 +2941,7 @@ body[data-theme="dark"] #tcCardDialog #tcCardModalError{color:#ffacb7!important}
  <div class="search-wrap"><svg class="icon" aria-hidden="true"><use href="#i-search"></use></svg><input type="search" id="siteSearch" placeholder="Search your flashcards, sets, or history..." autocomplete="off" aria-label="Search flashcards"><kbd class="shortcut">Ctrl /</kbd><div class="search-results" id="searchResults"></div></div>
  <div class="top-actions">
   <button type="button" id="headerThemeToggle" class="tc-header-theme" aria-label="Switch to dark mode" title="Switch to Dark Mode"><svg class="icon tc-theme-icon tc-theme-moon" aria-hidden="true"><use href="#i-moon"></use></svg><svg class="icon tc-theme-icon tc-theme-sun" aria-hidden="true"><use href="#i-sun"></use></svg><span class="tc-theme-label">Dark Mode</span></button>
-  <div class="top-popovers"><button class="icon-button" id="bellButton" aria-label="Review notifications"><svg class="icon" aria-hidden="true"><use href="#i-bell"></use></svg><span class="notification-dot" id="noticeDot"></span></button><div class="floating-popover" id="bellPopover"><h4>Notifications &amp; review reminders</h4><button type="button" id="tcGeneratedReadyBell" hidden aria-label="View newly generated flashcards"><strong>✓ Flashcards ready</strong><span id="tcGeneratedReadyBellText"></span><small>Open Flashcard Sets</small></button><div id="bellMessage" class="tc-bell-dates" aria-live="polite">No reviews due right now.</div><button class="btn-primary" id="bellReview">Open Review</button></div></div>
+  <div class="top-popovers"><button class="icon-button" id="bellButton" aria-label="Review notifications"><svg class="icon" aria-hidden="true"><use href="#i-bell"></use></svg><span class="notification-dot" id="noticeDot"></span></button><div class="floating-popover" id="bellPopover"><h4>Notifications &amp; review reminders</h4><button type="button" id="tcGeneratedReadyBell" hidden aria-label="View newly generated flashcards"><strong>✓ Flashcards ready</strong><span id="tcGeneratedReadyBellTitle" class="tc-ready-pdf-title"></span><span id="tcGeneratedReadyBellText"></span><small>Open Flashcard Sets</small></button><div id="bellMessage" class="tc-bell-dates" aria-live="polite">No reviews due right now.</div><button class="btn-primary" id="bellReview">Open Review</button></div></div>
   <span class="tc-header-separator" aria-hidden="true"></span>
   <button type="button" class="tc-header-icon" data-page="settings" aria-label="Settings" title="Settings"><svg class="icon" aria-hidden="true"><use href="#i-settings"></use></svg></button>
   <button type="button" class="tc-header-icon" data-page="help" aria-label="Help" title="Help"><svg class="icon" aria-hidden="true"><use href="#i-help"></use></svg></button>
@@ -3061,7 +3080,7 @@ body[data-theme="dark"] #tcCardDialog #tcCardModalError{color:#ffacb7!important}
  <div class="tc-calendar-dialog">
   <div class="tc-calendar-header"><div><h2 id="tcCalendarTitle">Your Review Schedule</h2><p id="tcCalendarSummary"></p></div><button id="tcCalendarClose" type="button" class="tc-calendar-close" aria-label="Close review schedule">×</button></div>
   <div id="tcCalendarDates" class="tc-calendar-dates"></div>
-  <div class="tc-calendar-footer"><button id="tcCalendarExport" type="button">Download All Dates (.ics)</button><p>Each date opens a separate Google Calendar event. Save the events you want, or import the .ics file into Google Calendar to add all dates.</p></div>
+  <div class="tc-calendar-footer"><p>Each date opens a separate Google Calendar event. Save the events you want in Google Calendar.</p></div>
  </div>
 </div>
 
@@ -3499,31 +3518,9 @@ function calendarEvent(){
  modal.hidden=false;
  $('tcCalendarClose').focus();
 }
-function tcIcsDate(date){return calendarDate(date);}
-function tcIcsEscape(value){return String(value).replace(/\\/g,'\\\\').replace(/\r?\n/g,'\\n').replace(/,/g,'\\,').replace(/;/g,'\\;');}
-function tcDownloadAllCalendarDates(){
- const groups=tcCalendarGroups();
- if(!groups.length)return;
- const stamp=tcIcsDate(new Date());
- const lines=['BEGIN:VCALENDAR','VERSION:2.0','CALSCALE:GREGORIAN','PRODID:-//TraceCard AI//Review Schedule//EN','METHOD:PUBLISH'];
- for(const group of groups){
-  const {start,end}=tcCalendarEventTime(group);
-  lines.push('BEGIN:VEVENT',`UID:tracecard-review-${group.day}@tracecard-ai`,`DTSTAMP:${stamp}`,
-   `DTSTART:${tcIcsDate(start)}`,`DTEND:${tcIcsDate(end)}`,
-   `SUMMARY:${tcIcsEscape(`TraceCard AI - Flashcard Review (${group.count} card${group.count===1?'':'s'})`)}`,
-   `DESCRIPTION:${tcIcsEscape(tcCalendarDescription(group))}`,'END:VEVENT');
- }
- lines.push('END:VCALENDAR');
- const blob=new Blob([lines.join('\r\n')+'\r\n'],{type:'text/calendar;charset=utf-8'});
- const url=URL.createObjectURL(blob);
- const a=document.createElement('a');a.href=url;a.download='TraceCard-AI-Review-Schedule.ics';
- document.body.appendChild(a);a.click();a.remove();
- setTimeout(()=>URL.revokeObjectURL(url),15000);
-}
 $('tcCalendarClose').addEventListener('click',tcCloseCalendarSchedule);
 $('tcCalendarSchedule').addEventListener('click',e=>{if(e.target===$('tcCalendarSchedule'))tcCloseCalendarSchedule();});
 document.addEventListener('keydown',e=>{if(e.key==='Escape'&&!$('tcCalendarSchedule').hidden)tcCloseCalendarSchedule();});
-$('tcCalendarExport').addEventListener('click',tcDownloadAllCalendarDates);
 
 $('calendarNext').onclick=calendarEvent;
 
@@ -3979,11 +3976,29 @@ function tcBgReadyNotice(){
  try{const data=JSON.parse(tcStore.getItem(tcBgReadyKey)||'null');return data&&typeof data.id==='string'?data:null;}
  catch{return null;}
 }
+function tcNoticeSetCount(notice){
+ const known=Number(notice.setCount);
+ if(Number.isInteger(known)&&known>0)return known;
+ // Older saved notifications did not include a set count. Recover only matching decks.
+ let matching=[];
+ if(String(notice.id).startsWith('local:')){
+  const stamp=new Date(String(notice.id).slice(6));
+  if(!Number.isNaN(stamp.getTime())){
+   const label=stamp.toLocaleString('en-PH',{year:'numeric',month:'short',day:'numeric',hour:'numeric',minute:'2-digit'});
+   matching=cards.filter(c=>c.pdf===notice.pdfName&&String(c.name||'').endsWith(' - '+label));
+  }
+ }else matching=cards.filter(c=>String(c.deck||'').startsWith(`background:${notice.id}:set:`));
+ return new Set(matching.map(c=>c.deck)).size;
+}
 function tcBgRefreshReadyBell(){
  const notice=tcBgReadyNotice(),button=$('tcGeneratedReadyBell');
  if(button){
   button.hidden=!notice;
-  if(notice)$('tcGeneratedReadyBellText').textContent=`${notice.total} card${notice.total===1?'':'s'} generated. Ready for validation.`;
+  if(notice){
+   $('tcGeneratedReadyBellTitle').textContent=notice.pdfName||'PDF';
+   const count=tcNoticeSetCount(notice);
+   $('tcGeneratedReadyBellText').textContent=`${count?`${count} set${count===1?'':'s'} • `:''}${notice.total} card${notice.total===1?'':'s'} generated. Ready for validation.`;
+  }
  }
  const dot=$('noticeDot');if(dot)dot.style.display=(notice||due().length)?'block':'none';
 }
@@ -3998,7 +4013,7 @@ $('tcGeneratedReadyBell').addEventListener('click',tcBgOpenCompletedSets);
 $('tcGeneratedToastView').addEventListener('click',tcBgOpenCompletedSets);
 $('tcGeneratedToastDismiss').addEventListener('click',()=>{$('tcGeneratedCompleteToast').hidden=true;});
 function tcBgNotifyCompleted(job,total){
- const notice={id:String(job.id),total:Number(total)||0,pdfName:String(job.pdfName||'PDF'),timestamp:Date.now()};
+ const notice={id:String(job.id),total:Number(total)||0,pdfName:String(job.pdfName||'PDF'),setCount:Number(job.sets)||0,timestamp:Date.now()};
  try{tcStore.setItem(tcBgReadyKey,JSON.stringify(notice));}catch(err){console.warn('Could not save generation notice:',err);}
  tcBgRefreshReadyBell();
  $('tcGeneratedCompleteToastText').textContent=`${notice.total} card${notice.total===1?'':'s'} saved. Ready for validation.`;
@@ -4397,7 +4412,7 @@ ${source}`;
   if(completed&&!tcGenerationCancelRequested){
    show('sets');
    window.scrollTo({top:0,behavior:'auto'});
-   if(completed===amount)tcBgNotifyCompleted({id:'local:'+generationDate,pdfName:fileName},completed*target);
+   if(completed===amount)tcBgNotifyCompleted({id:'local:'+generationDate,pdfName:fileName,sets:completed},completed*target);
   }
  }catch(err){
   tcProgressDisplay(completed*target+savedCount,amount*target,'saved','Generation was interrupted. Completed batches are retained locally.');
@@ -5030,6 +5045,16 @@ function openHistorySearchResult(cardId,deck){
  if(!cardsForHistory.some(c=>c.id===cardId&&c.deck===deck&&c.status==='approved'))return;
  historyDeck=deck;historyCard=cardId;historySearchOrigin=true;drawHistory();
 }
+function tcHistorySetMeta(card, fallbackIndex=1){
+ const name=String(card?.name||'').trim();
+ const match=name.match(/^Set\s+(\d+)(?:\s*[-–—]\s*(.*))?$/i);
+ const title=String(card?.pdf||'').trim().replace(/\.pdf$/i,'')||'Untitled PDF';
+ const setLabel=match?'Set '+match[1]:'Set '+fallbackIndex;
+ // Use the same generation date already stored in the set label; remove time only.
+ const date=String(match?.[2]||'').replace(/(?:,?\s+)\d{1,2}:\d{2}(?::\d{2})?(?:\s*[AP]\.?M\.?)?\s*$/i,'').trim();
+ return {title,setLabel,date:date||'Date unavailable'};
+}
+
 function drawHistoryGlobalSearch(historyCards){
  const content=$('historyContent');
  const terms=historySearchQuery.toLocaleLowerCase().split(/\s+/).filter(Boolean);
@@ -5132,7 +5157,8 @@ function drawHistory(){
   content.innerHTML=`
    <button class="tc-back" onclick="historyDeck='';drawHistory()">Back to Sets</button>
    <div class="box">
-    <h3>${safe(list[0]?.name||'Review Results')}</h3>
+    <h3>${safe(tcHistorySetMeta(list[0]).title)}</h3>
+    <div class="tc-history-set-meta"><span class="tc-history-set-number">${safe(tcHistorySetMeta(list[0]).setLabel)}</span><span class="tc-history-set-date">${safe(tcHistorySetMeta(list[0]).date)}</span></div>
     <h2>${correct}/${list.length}</h2>
     <p>
      <span class="correct">✓ ${correct} Correct</span> |
@@ -5181,12 +5207,18 @@ function drawHistory(){
 
   const resultMap=latestResults(d);
   const correct=list.filter(c=>resultMap.get(c.id)?.correct).length;
+  const meta=tcHistorySetMeta(list[0],i+1);
 
   return `
    <div class="history-row"
     onclick="historyDeck='${d}';historyCard='';historyFilter='all';drawHistory()">
-    <b>${safe(list[0].name||'Set '+(i+1))}</b>
-    <span class="history-score">${correct}/${list.length} &nbsp; →</span>
+    <div class="tc-history-set-meta">
+     <b class="tc-history-pdf-title">${safe(meta.title)}</b>
+     <span class="tc-history-set-number">${safe(meta.setLabel)}</span>
+     <span class="tc-history-set-date">${safe(meta.date)}</span>
+    </div>
+    <span class="history-score" aria-label="Score ${correct} out of ${list.length}">${correct}/${list.length}</span>
+    <span class="tc-history-set-arrow" aria-hidden="true">→</span>
    </div>`;
  }).join('')||'No approved flashcard sets yet.';
 }
@@ -5325,8 +5357,30 @@ document.addEventListener('visibilitychange',()=>{
 
 // Open only the flashcards scheduled for the selected reminder date.
 // No review logs, history scores or other scheduled cards are deleted.
-function tcStartReminderReview(day){
- const matches=scheduledCards().filter(c=>tcReviewDayKey(c.next)===day);
+function tcBellRatingOrder(){return ['Remembered','Partially Remembered','Difficult','Other scheduled reviews'];}
+function tcBellRatingMap(){
+ const latest=new Map();
+ for(const log of logs){if(log.cardId&&!latest.has(log.cardId))latest.set(log.cardId,log);}
+ return latest;
+}
+function tcBellCardRating(card,latest){
+ const log=latest.get(card.id);
+ const rating=log?.rating;
+ return log&&log.next===card.next&&tcBellRatingOrder().slice(0,3).includes(rating)?rating:'Other scheduled reviews';
+}
+function tcBellRatingGroups(){
+ const latest=tcBellRatingMap(),groups=new Map();
+ for(const card of scheduledCards()){
+  const day=tcReviewDayKey(card.next),rating=tcBellCardRating(card,latest),key=rating+'|'+day;
+  const when=new Date(card.next);
+  if(!groups.has(key))groups.set(key,{day,rating,when,count:0});
+  const group=groups.get(key);group.count++;if(when<group.when)group.when=when;
+ }
+ return [...groups.values()].sort((a,b)=>tcBellRatingOrder().indexOf(a.rating)-tcBellRatingOrder().indexOf(b.rating)||a.when-b.when);
+}
+function tcStartReminderReview(day,rating){
+ const latest=tcBellRatingMap();
+ const matches=scheduledCards().filter(c=>tcReviewDayKey(c.next)===day&&(!rating||tcBellCardRating(c,latest)===rating));
  if(!matches.length){tcRenderBellSchedule();return;}
  const unfinished=session&&Array.isArray(session.ids)&&session.index<session.ids.length;
  const hasProgress=unfinished&&(Object.keys(session.answers||{}).length||Object.keys(session.results||{}).length);
@@ -5337,26 +5391,26 @@ function tcStartReminderReview(day){
  show('review');
  window.scrollTo({top:0,behavior:'instant'});
 }
-function tcOpenBellReminder(day){
+function tcOpenBellReminder(day,rating){
  if(!day)return;
- if(day<=tcTodayDayKey()){tcStartReminderReview(day);return;}
+ if(day<=tcTodayDayKey()){tcStartReminderReview(day,rating);return;}
  const target=$('bellMessage');
- const row=[...target.querySelectorAll('.tc-bell-row')].find(item=>item.dataset.day===day);
+ const row=[...target.querySelectorAll('.tc-bell-row')].find(item=>item.dataset.day===day&&item.dataset.rating===rating);
  if(!row)return;
  const previous=target.querySelector('.tc-bell-early-choice');
- const wasOpen=previous?.dataset.day===day;
+ const wasOpen=previous?.dataset.day===day&&previous?.dataset.rating===rating;
  if(previous)previous.remove();
  target.querySelectorAll('.tc-bell-row').forEach(item=>item.setAttribute('aria-expanded','false'));
  if(wasOpen)return;
  row.setAttribute('aria-expanded','true');
  const choice=document.createElement('div');
- choice.className='tc-bell-early-choice';choice.dataset.day=day;
+ choice.className='tc-bell-early-choice';choice.dataset.day=day;choice.dataset.rating=rating;
  const date=new Date(day+'T12:00:00');
  const title=document.createElement('strong');title.textContent='Review ahead of schedule?';
  const detail=document.createElement('p');detail.textContent='Your review is scheduled for '+date.toLocaleDateString(undefined,{month:'short',day:'numeric',year:'numeric'})+'. Choose Review Now to study these cards early.';
  const actions=document.createElement('div');actions.className='tc-bell-early-actions';
  const now=document.createElement('button');now.type='button';now.className='tc-bell-review-early';now.textContent='Review Now';
- now.addEventListener('click',event=>{event.stopPropagation();tcStartReminderReview(day);});
+ now.addEventListener('click',event=>{event.stopPropagation();tcStartReminderReview(day,rating);});
  const keep=document.createElement('button');keep.type='button';keep.className='tc-bell-keep-scheduled';keep.textContent='Keep Scheduled';
  keep.addEventListener('click',event=>{event.stopPropagation();choice.remove();row.setAttribute('aria-expanded','false');row.focus();});
  actions.append(now,keep);choice.append(title,detail,actions);row.insertAdjacentElement('afterend',choice);
@@ -5366,7 +5420,7 @@ function tcOpenBellReminder(day){
 }
 function tcRenderBellSchedule(){
  const target=$('bellMessage');if(!target)return;
- const groups=tcCalendarGroups();
+ const groups=tcBellRatingGroups();
  target.replaceChildren();
  const dueNow=due().length;
  if(!groups.length){
@@ -5376,8 +5430,14 @@ function tcRenderBellSchedule(){
   return;
  }
  const today=tcTodayDayKey();
+ let currentRating='';
  for(const group of groups){
-  const row=document.createElement('button');row.type='button';row.className='tc-bell-row';row.dataset.day=group.day;
+  if(currentRating!==group.rating){
+   currentRating=group.rating;
+   const heading=document.createElement('h5');heading.className='tc-bell-rating-heading';heading.textContent=currentRating;
+   target.appendChild(heading);
+  }
+  const row=document.createElement('button');row.type='button';row.className='tc-bell-row';row.dataset.day=group.day;row.dataset.rating=group.rating;
   const isDue=group.day<=today;
   if(isDue)row.classList.add('tc-bell-due');
   row.setAttribute('aria-expanded','false');
@@ -5460,17 +5520,18 @@ $('bellMessage').addEventListener('click',event=>{
  const row=event.target.closest('.tc-bell-row');
  if(row&&$('bellMessage').contains(row)){
   event.preventDefault();
-  tcOpenBellReminder(row.dataset.day);
+  tcOpenBellReminder(row.dataset.day,row.dataset.rating);
  }
 });
 $('bellButton').onclick=()=>{tcRenderBellSchedule();$('bellPopover').classList.toggle('show');$('profilePopover').classList.remove('show');};
 $('profileButton').onclick=()=>{$('profilePopover').classList.toggle('show');$('bellPopover').classList.remove('show');};
 $('bellReview').onclick=()=>{
- const groups=tcCalendarGroups();
+ const groups=tcBellRatingGroups().sort((a,b)=>a.when-b.when);
  if(!groups.length)return;
  const today=tcTodayDayKey();
  const dueGroup=groups.find(group=>group.day<=today);
- tcOpenBellReminder((dueGroup||groups[0]).day);
+ const selected=dueGroup||groups[0];
+ tcOpenBellReminder(selected.day,selected.rating);
 };
 $('profileSettings').onclick=()=>{$('profilePopover').classList.remove('show');show('settings');};
 const savedTheme=(()=>{try{return tcStore.getItem(themeKey)==='dark'?'dark':'light'}catch(e){return 'light'}})(); // Respect saved appearance
