@@ -9,7 +9,7 @@ const path = require('path');
 const IS_VERCEL = Boolean(process.env.VERCEL);
 // Vercel background scheduling is optional; status polling can finish batches
 // when the package or request context is unavailable.
-const TC_BACKEND_VERSION = 'research-sheets-verification-1';
+const TC_BACKEND_VERSION = 'research-redis-verification-2';
 let backgroundWaitUntil = null;
 if (IS_VERCEL) {
   try {
@@ -1048,30 +1048,7 @@ if not record.studentEmail then
   redis.call('SET', KEYS[2], cjson.encode(record), 'KEEPTTL')
 end
 return {'ok', session.code}`;
-// A claim is not shown to the student until the spreadsheet acknowledges it.
-// Both settings are server-only. The Apps Script endpoint accepts only the secret.
-const TC_SHEETS_URL = (process.env.TC_SHEETS_WEBHOOK_URL || '').trim();
-const TC_SHEETS_SECRET = (process.env.TC_SHEETS_WEBHOOK_SECRET || '').trim();
-function tcSheetsConfigured() {
-  return /^https:\/\/script\.google\.com\/(?:a\/macros\/[^/]+\/|macros\/)s\/[A-Za-z0-9_-]+\/exec$/.test(TC_SHEETS_URL) && TC_SHEETS_SECRET.length >= 32;
-}
-async function tcRecordClaimInSheets(code, email) {
-  if (!tcSheetsConfigured()) throw new Error('Survey storage is not configured.');
-  // A stable pseudonymous record ID, not the private review session/job ID.
-  const recordId = crypto.createHash('sha256').update('tracecard:sheet:' + code).digest('hex').slice(0,32);
-  const controller = new AbortController();
-  const timeout = setTimeout(() => controller.abort(), 25000);
-  try {
-    const response = await fetch(TC_SHEETS_URL, {
-      method:'POST', headers:{'Content-Type':'application/json'},
-      body:JSON.stringify({secret:TC_SHEETS_SECRET,email,code,recordId}),
-      redirect:'follow', signal:controller.signal,
-    });
-    if (!response.ok) throw new Error('Survey storage request failed.');
-    const result = await response.json();
-    if (result?.ok !== true) throw new Error('Survey storage did not acknowledge claim.');
-  } finally { clearTimeout(timeout); }
-}
+// Claims are stored in Redis; the survey spreadsheet verifies them on form submission.
 app.post('/api/research/review/claim', async (req,res) => {
   res.set('Cache-Control','no-store');
   const {sessionId,jobId,email} = req.body || {};
@@ -1079,7 +1056,6 @@ app.post('/api/research/review/claim', async (req,res) => {
   if (!BG_CONFIGURED) return res.status(503).json({error:'Verification storage unavailable.'});
   if (!tcProofID(sessionId) || !bgSafeJobID(jobId) || normalized.length > 254 || !/^[a-z0-9._%+\-]+@cvsu\.edu\.ph$/.test(normalized))
     return res.status(400).json({error:'Enter your official CvSU email address (@cvsu.edu.ph).'});
-  if (!tcSheetsConfigured()) return res.status(503).json({error:'Survey verification is not configured. Contact the researchers.'});
   try {
     const key=tcProofSessionKey(sessionId), raw=await bgRedis('GET',key);
     const proof=raw?JSON.parse(raw):null;
@@ -1088,8 +1064,6 @@ app.post('/api/research/review/claim', async (req,res) => {
     const hash=crypto.createHash('sha256').update(jobId).digest('hex');
     const result=await bgRedis('EVAL',TC_PROOF_BIND_SCRIPT,2,key,tcProofCodeKey(proof.code),jobId,proof.code,hash,normalized,Date.now());
     if(result?.[0]==='ok'){
-      try { await tcRecordClaimInSheets(result[1],normalized); }
-      catch { return res.status(503).json({error:'Could not save your completion code to the research records. Retry using the same email.'}); }
       return res.json({ok:true,code:result[1]});
     }
     if(result?.[0]==='bound')return res.status(409).json({error:'This code is already linked to another email. Contact the researchers if you entered the wrong address.'});
